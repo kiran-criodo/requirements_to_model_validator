@@ -59,9 +59,13 @@ coverage?", "give me the prioritized punch-list", "are the safety requirements v
   test artifacts exist, Design↔Verification is genuinely absent — report it, don't soften it.
 
 ## Notes / limits
-- ASIL classification is keyword/feature-level and clearly labelled indicative. For a source
-  that carries explicit ASIL/Type tags (e.g. a `REQ-ACC` table), wire those through instead of
-  deriving.
+- ASIL classification uses **explicit tags when the source has them** — the ASIL standard's
+  worked REQ-ACC verdict (001/002 QM, 003/004 ASIL B) and the Type column
+  (Process/Traceability = N/A, Safety = ASIL B). It only falls back to indicative keyword
+  classification for untagged narrative requirements (`Requirement.docx`).
+- The punch-list leads with **requirements that have no model implementation** (gaps),
+  weighted by ASIL — so an ASIL-B safety gap (e.g. REQ-ACC-004) ranks P1 — then verification
+  gaps on implemented requirements, orphan logic, and ASPICE process gaps.
 - Program-stage auto-detection keys off artifact filenames next to the `.slx`; override with
   `--stage` when you know the true stage.
 - Next planned step: natural-language Q&A over `output/*.json` (task 7).

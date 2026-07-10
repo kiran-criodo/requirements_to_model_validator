@@ -42,10 +42,30 @@ ASIL_WEIGHT = {"QM": 0, "ASIL A": 1, "ASIL B": 2, "ASIL C": 3, "ASIL D": 4}
 # --------------------------------------------------------------------------- #
 # ASIL classification (per ASIL_Classification_Standard worked ACC example)
 # --------------------------------------------------------------------------- #
+# Explicit worked classification from ASIL_Classification_Standard.docx (REQ-ACC example):
+# comfort set-speed/cruise = QM; gap-maintenance + decel/accel limiting = ASIL B.
+REQACC_ASIL = {
+    "req-acc-001": ("QM", "Comfort set-speed input — QM per the ASIL standard's worked ACC example."),
+    "req-acc-002": ("QM", "Comfort speed control when no lead vehicle — QM per the worked ACC example."),
+    "req-acc-003": ("ASIL B", "Gap-maintenance throttle/brake request — ASIL B per the worked ACC example."),
+    "req-acc-004": ("ASIL B", "Deceleration/acceleration limiting (safety) — ASIL B per the worked ACC example."),
+}
+
+
 def classify_asil(req):
-    """Indicative, feature-level ASIL. ISO 26262-3 worked ACC classification puts the
-    longitudinal speed/gap-control path at ASIL B (S2/E4/C2); comfort-only mode
-    housekeeping with no actuation authority is Quality Managed."""
+    """ASIL per requirement. Uses explicit tags when present: the ASIL standard's worked
+    REQ-ACC classification, then the Type column (Process/Traceability = N/A, Safety = ASIL B).
+    Falls back to indicative, feature-level keyword classification for untagged narrative
+    requirements (ISO 26262-3 worked ACC verdict: control path = ASIL B, mode housekeeping = QM)."""
+    rid = req.get("id", "").lower()
+    if rid in REQACC_ASIL:
+        return REQACC_ASIL[rid]
+    rtype = (req.get("type") or "").lower()
+    if rtype in ("process", "traceability"):
+        return "N/A", f"{req.get('type')} requirement — not a safety function; no ASIL allocation."
+    if rtype == "safety":
+        return "ASIL B", "Safety-typed requirement on the ACC control path — ASIL B (per the worked ACC classification)."
+
     title = req["title"].lower()
     full = (req["title"] + " " + req["text"]).lower()
     # Match the safe-state test against the TITLE only, so a parent requirement that merely
@@ -127,7 +147,11 @@ def detect_stage(art):
 # ISO 26262-6 Part 6 traceability chain (per requirement)
 # --------------------------------------------------------------------------- #
 def iso_chain(res, tests_linked):
-    """Which links of the bidirectional trace chain exist for this requirement."""
+    """Which links of the bidirectional trace chain exist for this requirement.
+    Process requirements have no model element, so the chain is not applicable (None)."""
+    if res["status"] == "Process":
+        return {k: None for k in ("Req ↔ Architecture", "Architecture ↔ Design",
+                                  "Design ↔ Verification", "Verification ↔ Safety case")}
     traced = res["status"] in ("Matched", "Partial") and bool(res["target"])
     leaf = traced  # matched to a concrete subsystem/state = detailed-design element
     return {
@@ -146,8 +170,29 @@ def build_punchlist(rows, orphans, art, stage):
     items = []
     late = stage >= 6  # verification expected from stage 6 (MIL) onward
 
-    # 1) Missing verification linkage — the dominant finding here.
-    unverified = [r for r in rows if not r["chain"]["Design ↔ Verification"]]
+    # 0) Requirements with NO model implementation (gaps) — the dominant finding when the
+    #    requirements outrun the model. An ASIL-B safety gap is the highest-severity item.
+    gaps = [r for r in rows if r["status"] == "Gap"]
+    by_asil = {}
+    for r in gaps:
+        by_asil.setdefault(r["asil"], []).append(r)
+    for asil, group in sorted(by_asil.items(), key=lambda kv: -ASIL_WEIGHT.get(kv[0], 0)):
+        w = ASIL_WEIGHT.get(asil, 0)
+        score = w * 4 + 3 + (2 if late else 0)   # a missing implementation is severe
+        items.append({
+            "score": score, "asil": asil,
+            "title": f"{len(group)} {asil} requirement(s) with no model implementation",
+            "detail": ("Traced signal / behaviour is absent from the model — the requirement "
+                       "is not yet realised. "
+                       + ("Safety requirement with no implementation." if w >= 2 else "")),
+            "requirements": [g["id_display"] for g in group],
+            "action": "Implement in the model, then establish requirement→model traceability.",
+        })
+
+    # 1) Missing verification linkage — for requirements that ARE implemented.
+    unverified = [r for r in rows if r["status"] in ("Matched", "Partial")
+                  and not r["chain"].get("Design ↔ Verification")
+                  and r["asil"] != "N/A"]
     by_asil = {}
     for r in unverified:
         by_asil.setdefault(r["asil"], []).append(r)
@@ -249,19 +294,22 @@ def render(rows, orphans, punch, aspice, art, meta):
     asil_counts = {}
     for r in rows:
         asil_counts[r["asil"]] = asil_counts.get(r["asil"], 0) + 1
-    verified = sum(1 for r in rows if r["chain"]["Design ↔ Verification"])
+    implemented = [r for r in rows if r["status"] in ("Matched", "Partial")]
+    gaps = [r for r in rows if r["status"] == "Gap"]
+    verified = sum(1 for r in implemented if r["chain"].get("Design ↔ Verification"))
     p1 = sum(1 for it in punch if it["priority"] == "P1")
     stage = meta["stage"]
 
-    # KPI tiles
+    # KPI tiles — lead with gaps when the requirements outrun the model, else verification.
     asil_b = asil_counts.get("ASIL B", 0)
+    asil_b_gaps = sum(1 for r in gaps if r["asil"] == "ASIL B")
     tiles = f"""
       <div class="tile stripe s-bad"><div class="lbl">Priority-1 findings</div>
         <div class="val mono">{p1}</div><div class="note">highest ASIL × stage risk</div></div>
       <div class="tile stripe s-warn"><div class="lbl">ASIL B requirements</div>
-        <div class="val mono">{asil_b}</div><div class="note">of {n} · indicative allocation</div></div>
+        <div class="val mono">{asil_b}</div><div class="note">of {n} · {asil_b_gaps} with no implementation</div></div>
       <div class="tile stripe s-bad"><div class="lbl">Verification coverage</div>
-        <div class="val mono">{verified}/{n}</div><div class="note">Design↔Verification links present</div></div>
+        <div class="val mono">{verified}/{len(implemented)}</div><div class="note">of implemented reqs · Design↔Verification</div></div>
       <div class="tile stripe s-accent"><div class="lbl">Program stage</div>
         <div class="val mono">{stage}</div><div class="note">{e(PROGRAM_STAGES[stage])}</div></div>
     """
@@ -307,12 +355,15 @@ def render(rows, orphans, punch, aspice, art, meta):
             <div class="pl-action"><b>Action:</b> {e(it['action'])}</div></td>
         </tr>""")
 
-    # ISO chain per requirement
+    # ISO chain per requirement (None = not applicable, e.g. a process requirement)
+    def _link(k, v):
+        if v is None:
+            return f'<span class="link">— {e(k)}</span>'
+        return f'<span class="link {"ok" if v else "no"}">{"✓" if v else "✗"} {e(k)}</span>'
+
     chain_rows = []
     for r in rows:
-        links = "".join(
-            f'<span class="link {"ok" if v else "no"}">{"✓" if v else "✗"} {e(k)}</span>'
-            for k, v in r["chain"].items())
+        links = "".join(_link(k, v) for k, v in r["chain"].items())
         chain_rows.append(f"""
         <tr>
           <td><div class="req-id mono">{e(r['id_display'])}</div>

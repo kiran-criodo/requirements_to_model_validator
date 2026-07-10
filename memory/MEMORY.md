@@ -14,6 +14,8 @@ rule, or a better way to do something, it should save it here and add a pointer 
   containment trick, Stateflow/SID gotchas, and the two ACC requirement docs.
 - [Compliance audit notes](compliance-audit-notes.md) — ASIL/ISO 26262/ASPICE derivation rules,
   the SIL/HIL substring gotcha, and the honest ACC compliance result.
+- [REQ-ACC gap analysis notes](reqacc-gap-analysis-notes.md) — the tagged-table source,
+  declared-signal matching, explicit ASIL map, and the real ACC gap result.
 
 ## Personal memories (kept private, not shared)
 Files named `local_*.md` are personal to you and are never shared. Copy

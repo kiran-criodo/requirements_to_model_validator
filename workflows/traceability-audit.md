@@ -11,7 +11,14 @@ Triggers like: "run a traceability audit", "check the ACC model against its requ
 "is there any orphan logic in the model?".
 
 ## Inputs
-- **Requirements document** (`.docx`) — the requirement set to validate against.
+- **Requirements document** (`.docx`) — the requirement set to validate against. Two formats
+  are auto-detected:
+  - Narrative `Requirement.docx` ("Requirement 1 …" headings) — the default.
+  - A tagged table `Req ID | Description | Type | Traced Signal` (e.g.
+    `resources/UseCase_ACC_Requirements.docx`) — matched on the declared Traced Signal, so
+    differing naming conventions (SetSpeed_Req_kph vs Set_Speed) and real gaps surface.
+  When auditing a second source against the same model, pass distinct `--out`/`--json`
+  (convention: `REQACC_*`) so you don't overwrite the first result.
   Default: `resources/ACC (Adaptive Cruise Control)/Requirement.docx`.
 - **Simulink model** (`.slx`). Default: `resources/ACC (Adaptive Cruise Control)/ACC_Project.slx`.
 - **Requirement links** (`.slmx`, optional but recommended) — existing Requirements Toolbox

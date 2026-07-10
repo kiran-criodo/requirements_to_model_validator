@@ -51,8 +51,60 @@ def _norm_req_id(raw: str) -> str:
     return re.sub(r"\s+", "", raw).lower()
 
 
+def _docx_tables(xml: str):
+    """Return every Word table as a list of rows, each row a list of cell strings."""
+    tables = []
+    for t in re.findall(r"<w:tbl>.*?</w:tbl>", xml, re.S):
+        rows = []
+        for tr in re.findall(r"<w:tr\b.*?</w:tr>", t, re.S):
+            cells = [html.unescape(re.sub(r"<[^>]+>", "", re.sub(r"</w:p>", " ", tc))).strip()
+                     for tc in re.findall(r"<w:tc>.*?</w:tc>", tr, re.S)]
+            rows.append([re.sub(r"\s+", " ", c) for c in cells])
+        tables.append(rows)
+    return tables
+
+
+def _parse_req_table(rows):
+    """Parse a 'Req ID | Description | Type | Traced Signal' table."""
+    hdr = [c.lower() for c in rows[0]]
+
+    def col(*names, default=None):
+        for i, h in enumerate(hdr):
+            if any(nm in h for nm in names):
+                return i
+        return default
+
+    ci = col("req id", "requirement id", "id", default=0)
+    cd = col("description", "requirement", default=1)
+    ct = col("type")
+    cs = col("traced signal", "signal")
+    reqs = []
+    for row in rows[1:]:
+        if len(row) <= ci or not row[ci].strip():
+            continue
+        rid = row[ci].strip()
+        desc = row[cd].strip() if cd is not None and len(row) > cd else ""
+        typ = row[ct].strip() if ct is not None and len(row) > ct else None
+        sig = row[cs].strip() if cs is not None and len(row) > cs else None
+        if sig and sig.upper() in ("N/A", "NA", "-", "—", ""):
+            sig = None
+        title = re.split(r"(?<=[a-z0-9])[.;] ", desc)[0][:90] if desc else rid
+        reqs.append({"id": rid.lower(), "id_display": rid, "title": title, "text": desc,
+                     "type": typ, "declared_signal": sig, "format": "table"})
+    return reqs
+
+
 def parse_requirements(docx_path: str):
-    text = _strip_tags(_read_zip_member(docx_path, lambda n: n == "word/document.xml"))
+    """Parse requirements from a .docx. Auto-detects a tagged table (Req ID | Description |
+    Type | Traced Signal); otherwise falls back to narrative 'Requirement N …' headings."""
+    xml = _read_zip_member(docx_path, lambda n: n == "word/document.xml")
+    for rows in _docx_tables(xml):
+        if rows and rows[0] and any(k in rows[0][0].lower() for k in ("req id", "requirement id")):
+            parsed = _parse_req_table(rows)
+            if parsed:
+                return parsed
+
+    text = _strip_tags(xml)
     lines = [ln.rstrip() for ln in text.splitlines()]
     reqs, cur = [], None
     for ln in lines:
@@ -62,6 +114,7 @@ def parse_requirements(docx_path: str):
                 "id": _norm_req_id(m.group(1)),
                 "id_display": "Requirement " + m.group(1).strip(),
                 "title": m.group(2).strip(),
+                "type": None, "declared_signal": None, "format": "narrative",
                 "body_lines": [],
             }
             reqs.append(cur)
@@ -189,8 +242,22 @@ def resolve_target(model_id: str, model):
 # --------------------------------------------------------------------------- #
 # Task 3 & 4 — match requirements to model elements, flag gaps/orphans/partials
 # --------------------------------------------------------------------------- #
+# Common words that shouldn't count as evidence of a semantic match.
+_STOP = {"the", "and", "req", "shall", "system", "within", "when", "value", "using",
+         "input", "output", "signal", "driver", "mode", "kph", "mps", "via", "range",
+         "normal", "commanded", "control", "vehicle", "detected", "state", "switch",
+         "press", "review", "check", "run", "prior", "with", "for", "per", "that"}
+
+
 def _tokens(s: str):
+    # Split camelCase ("SetSpeed" -> "Set Speed") so differently-cased signal names
+    # (SetSpeed_Req_kph vs Set_Speed) still share tokens.
+    s = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", s)
     return set(t for t in re.split(r"[^A-Za-z0-9]+", s.lower()) if len(t) > 2)
+
+
+def _sig_tokens(s: str):
+    return _tokens(s) - _STOP
 
 
 def audit(reqs, model, links):
@@ -210,12 +277,19 @@ def audit(reqs, model, links):
         name_pool[b["name"].lower()] = ("subsystem", b["name"])
     for ssid, nm in model["states"].items():
         name_pool[nm.lower()] = ("state", nm)
+    # everything a requirement could semantically match against
+    element_pool = (sorted(model["signals"])
+                    + [b["name"] for b in model["subsystems"]]
+                    + sorted(model["states"].values()))
 
     results = []
     for r in reqs:
         rtokens = _tokens(r["text"])
-        # Signal-like identifiers named in the requirement (don't split on '_').
+        declared = r.get("declared_signal")
+        # Signal-like identifiers named in the requirement (+ the declared traced signal).
         idents = set(re.findall(r"[A-Za-z][A-Za-z0-9_]+", r["text"]))
+        if declared:
+            idents.add(declared)
         mentioned = sorted({model_signal_lower[i.lower()] for i in idents
                             if i.lower() in model_signal_lower})
         # Named like a signal (underscore + a capital) but absent as a signal,
@@ -228,42 +302,75 @@ def audit(reqs, model, links):
         })
 
         evidence, target, confidence = None, None, None
+        rtype = (r.get("type") or "").lower()
 
-        # (a) existing requirement link
-        lk = link_by_req.get(r["id"])
-        if lk:
-            evidence = "Requirement link (.slmx)"
-            target = resolve_target(lk["model_id"], model)
-            confidence = "high"
+        if rtype == "process":
+            # A process requirement (e.g. "run Model Advisor checks") has no model element;
+            # it is evaluated in the compliance layer against ASPICE work products.
+            status = "Process"
+            evidence = "Process requirement — verified via work products (ASPICE), not a model element"
         else:
-            # (b) naming convention: a subsystem/state named after the requirement
-            best = None
-            for nm_lower, (kind, disp) in name_pool.items():
-                overlap = _tokens(disp) & rtokens
-                title_hit = _tokens(r["title"]) and _tokens(r["title"]) <= _tokens(disp)
-                if title_hit or len(overlap) >= 2:
-                    score = (2 if title_hit else 0) + len(overlap)
-                    if not best or score > best[0]:
-                        best = (score, kind, disp)
-            if best:
-                evidence = "Naming convention"
-                target = best[2]
-                confidence = "high" if best[0] >= 2 else "medium"
+            lk = link_by_req.get(r["id"])
+            if lk:                                  # (a) existing requirement link
+                evidence = "Requirement link (.slmx)"
+                target = resolve_target(lk["model_id"], model)
+                confidence = "high"
+            elif declared:
+                # Table-format requirement: match on its declared Traced Signal — NOT the
+                # prose, which incidentally shares tokens with unrelated model elements.
+                dl = declared.lower()
+                if dl in model_signal_lower:        # (b) traced signal present verbatim
+                    evidence = "Traced signal present in model"
+                    target, confidence = model_signal_lower[dl], "high"
+                else:                               # (c) traced signal under a different name
+                    key = _sig_tokens(declared)
+                    sbest = None
+                    for name in element_pool:       # signals first, then subsystems/states
+                        ov = key & _sig_tokens(name)
+                        if len(ov) >= 2 and (sbest is None or len(ov) > len(sbest[1])):
+                            sbest = (name, ov)
+                    if sbest:
+                        evidence = "Semantic (naming differs)"
+                        target, confidence = sbest[0], "medium"
+                    # else: the traced signal is absent from the model -> Gap
             else:
-                # (c) semantic similarity via signal / token overlap
-                if mentioned:
+                # Narrative / untagged requirement: (d) naming convention on title, then
+                # (e) any model signal it names, then (f) title token-overlap.
+                best = None
+                for nm_lower, (kind, disp) in name_pool.items():
+                    overlap = _tokens(disp) & rtokens
+                    title_hit = _tokens(r["title"]) and _tokens(r["title"]) <= _tokens(disp)
+                    if title_hit or len(overlap) >= 2:
+                        score = (2 if title_hit else 0) + len(overlap)
+                        if not best or score > best[0]:
+                            best = (score, kind, disp)
+                if best:
+                    evidence = "Naming convention"
+                    target = best[2]
+                    confidence = "high" if best[0] >= 2 else "medium"
+                elif mentioned:
                     evidence = "Semantic (signal overlap)"
-                    target = ", ".join(mentioned[:3])
-                    confidence = "medium"
+                    target, confidence = ", ".join(mentioned[:3]), "medium"
+                else:
+                    key = _sig_tokens(r["title"])
+                    sbest = None
+                    for name in element_pool:
+                        ov = key & _sig_tokens(name)
+                        if len(ov) >= 2 and (sbest is None or len(ov) > len(sbest[1])):
+                            sbest = (name, ov)
+                    if sbest:
+                        evidence = "Semantic (naming differs)"
+                        target, confidence = sbest[0], "medium"
 
-        if target:
-            status = "Partial" if (missing_signals or confidence == "medium") else "Matched"
-        else:
-            status = "Gap"
+            if target:
+                status = "Partial" if (missing_signals or confidence in ("medium", "low")) else "Matched"
+            else:
+                status = "Gap"
 
         results.append({
             "id": r["id"], "id_display": r["id_display"], "title": r["title"],
-            "text": r["text"], "status": status, "evidence": evidence,
+            "text": r["text"], "type": r.get("type"), "declared_signal": declared,
+            "status": status, "evidence": evidence,
             "target": target, "confidence": confidence,
             "mentioned_signals": mentioned, "missing_signals": missing_signals,
         })
@@ -392,6 +499,7 @@ h2::after{content:"";flex:1;height:1px;background:var(--border);}
 .p-warn{color:var(--warn);background:var(--warn-bg)} .p-warn .dot{background:var(--warn)}
 .p-bad{color:var(--bad);background:var(--bad-bg)} .p-bad .dot{background:var(--bad)}
 .p-orphan{color:var(--orphan);background:var(--orphan-bg)} .p-orphan .dot{background:var(--orphan)}
+.p-na{color:var(--text-dim);background:var(--surface-2);border:1px solid var(--border)} .p-na .dot{background:var(--text-dim)}
 
 .tablecard{background:var(--surface);border:1px solid var(--border);border-radius:12px;
   box-shadow:var(--shadow);overflow:hidden;}
@@ -407,6 +515,7 @@ td.stripe{border-left:4px solid transparent;}
 tr.st-Matched td.stripe{border-left-color:var(--good)}
 tr.st-Partial td.stripe{border-left-color:var(--warn)}
 tr.st-Gap td.stripe{border-left-color:var(--bad)}
+tr.st-Process td.stripe{border-left-color:var(--text-dim)}
 .req-id{font-weight:600;font-size:12.5px;color:var(--text)}
 .req-title{color:var(--text-dim);font-size:12.5px;margin-top:2px;}
 .tgt{color:var(--text);} .ev{color:var(--text-dim);font-size:12px;}
@@ -465,19 +574,21 @@ def render_html(results, orphans, meta):
     n_match = sum(1 for r in results if r["status"] == "Matched")
     n_part = sum(1 for r in results if r["status"] == "Partial")
     n_gap = sum(1 for r in results if r["status"] == "Gap")
+    n_proc = sum(1 for r in results if r["status"] == "Process")
+    impl = total - n_proc                      # requirements that map to a model element
     covered = n_match + n_part
-    cov_pct = round(100 * covered / total) if total else 0
+    cov_pct = round(100 * covered / impl) if impl else 0
     n_orphan_f = len(orphans["functional"])
     n_orphan_s = len(orphans["structural"])
 
     def pct(n):
-        return (100 * n / total) if total else 0
+        return (100 * n / impl) if impl else 0
 
     # KPI tiles
     tiles = f"""
       <div class="tile stripe s-accent"><div class="lbl">Requirement coverage</div>
         <div class="val mono">{cov_pct}%</div>
-        <div class="note">{covered} of {total} requirements traced to the model</div>
+        <div class="note">{covered} of {impl} implementation requirements traced{f' · {n_proc} process' if n_proc else ''}</div>
         <div class="bar" role="img" aria-label="coverage breakdown">
           <span class="b-good" style="width:{pct(n_match):.1f}%"></span>
           <span class="b-warn" style="width:{pct(n_part):.1f}%"></span>
@@ -602,7 +713,8 @@ def render_html(results, orphans, meta):
 
 
 def _status_pill(status):
-    cls = {"Matched": "p-good", "Partial": "p-warn", "Gap": "p-bad"}[status]
+    cls = {"Matched": "p-good", "Partial": "p-warn", "Gap": "p-bad",
+           "Process": "p-na"}.get(status, "p-na")
     return f'<span class="pill {cls}"><span class="dot"></span>{status}</span>'
 
 

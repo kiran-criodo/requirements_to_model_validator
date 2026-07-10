@@ -144,8 +144,14 @@ underlying traceability matrix data.
 - Workflow 2 (tasks 5–6): ASIL classification, ISO 26262-6 Part 6 trace-chain check, ASPICE
   SWE.1–6 status, and ASIL×program-stage prioritized punch-list. `tools/compliance_audit.py`.
 - Workflow 3 (task 7): grounded natural-language Q&A over the JSON outputs. `tools/ask.py`.
-- Planned: wiring explicit ASIL/Type tags when the requirements source carries them (e.g. a
-  REQ-ACC table).
+- All workflows handle **two requirement-source formats**: the narrative `Requirement.docx`
+  (auto-matches 1:1 via `.slmx`) and the tagged **REQ-ACC table** in
+  `UseCase_ACC_Requirements.docx` (explicit Type + Traced Signal + ASIL). Point any workflow at
+  a source with `--req` and give distinct `--out/--json` so results don't clobber each other
+  (REQ-ACC results use the `REQACC_*` filenames).
+- Against the REQ-ACC table the audit surfaces the real gaps: only REQ-ACC-001 (set-speed)
+  partially maps; the control/actuation/safety requirements (incl. **REQ-ACC-004 decel limit,
+  ASIL B**) have no model implementation.
 
 # Rules
 <!-- Sensible defaults below — keep them. Add agent-specific rules under "TODO". -->
