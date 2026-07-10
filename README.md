@@ -1,7 +1,8 @@
-# Agent Builder Template
+# Requirements to Model Validator
 
-A starter folder for building your own AI **agent** in any AI-enabled code editor —
-**no coding required**. You build the whole thing just by chatting with an AI assistant.
+An AI **agent** that validates a model against a set of requirements. Built in any
+AI-enabled code editor — **no coding required**. You build and run it just by chatting
+with an AI assistant.
 
 > **Works with any IDE and any LLM.** Use whatever AI-enabled IDE you like — VSCode,
 > Cursor, JetBrains, and others — with whatever LLM that IDE supports (Claude, GPT,

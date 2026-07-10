@@ -99,7 +99,7 @@ Map of steps → files you populate:
 # PART B — THE AGENT CONTRACT
 <!-- This is what the finished agent runs by. Fill in every TODO during the build. -->
 
-# Project Context
+# Project Context — Requirements to Model Validator
 <!-- TODO (Step 1): In 2–4 sentences, describe what this agent does, why it exists,
      and who uses it. Replace this comment. -->
 
