@@ -100,8 +100,47 @@ Map of steps → files you populate:
 <!-- This is what the finished agent runs by. Fill in every TODO during the build. -->
 
 # Project Context — Requirements to Model Validator
-<!-- TODO (Step 1): In 2–4 sentences, describe what this agent does, why it exists,
-     and who uses it. Replace this comment. -->
+
+**What it is.** An agent that gives ADAS/MBD engineers *continuous, live visibility* into
+requirement-to-model traceability — the audit that is normally done by hand right before an
+ISO 26262 / ASPICE milestone review. It reads a requirements document and the corresponding
+Simulink model, matches each requirement to the model element(s) that implement it, and
+surfaces what is traced, what is missing, and where the gaps sit.
+
+**Who uses it.** Function owners, safety engineers, and MBD leads on ADAS programs (the
+worked example here is Adaptive Cruise Control) who today only get this picture from a manual
+pre-review audit.
+
+**What it does (target capability, built incrementally).**
+1. Parse the requirements set into atomic, testable requirement statements.
+2. Parse the Simulink model structure (subsystems, blocks, signals, Stateflow states) and its
+   existing requirement links.
+3. Match each requirement to model element(s) via requirement links, naming conventions, and
+   semantic similarity.
+4. Flag **gaps** (requirements with no model implementation), **orphan logic** (model elements
+   with no traced requirement), and **partial** mappings.
+5. *(later)* Cross-check safety-critical (ASIL-tagged) requirements against ISO 26262 Part 6
+   traceability expectations and ASPICE SWE.1–SWE.6 work-product linkage.
+6. *(later)* Produce a prioritized punch-list ranked by ASIL level × program stage.
+7. *(later)* Answer natural-language follow-up questions (e.g. "which AEB requirements aren't
+   yet in the model?").
+
+**Inputs (all local files — no MATLAB or connectors required).** `.slx` and `.slmx` are parsed
+directly as zipped XML; `.docx` as zipped XML.
+- Requirements: `resources/ACC (Adaptive Cruise Control)/Requirement.docx` (the authoritative
+  requirement set for the ACC example — it maps 1:1 to the model via the `.slmx` link set).
+- Model: `resources/ACC (Adaptive Cruise Control)/ACC_Project.slx`.
+- Existing requirement links: `resources/ACC (Adaptive Cruise Control)/ACC_Project.slmx`.
+- Standards / rulebooks in `resources/`: `ASIL_Classification_Standard.docx`,
+  `ISO26262_ASPICE_Compliance_Guidelines.docx`, `Program_Stage_Taxonomy.docx` (used by the
+  later compliance/prioritization steps).
+
+**Output.** A self-contained interactive HTML **traceability dashboard** in `output/`
+(coverage %, matched/gap/orphan/partial breakdown, per-requirement drill-down), plus the
+underlying traceability matrix data.
+
+**Current build status.** Workflow 1 = tasks 1–4 (parse → match → flag) rendered to the HTML
+dashboard. Compliance cross-check, ASIL×stage prioritization, and NL Q&A are planned grow steps.
 
 # Rules
 <!-- Sensible defaults below — keep them. Add agent-specific rules under "TODO". -->
@@ -115,8 +154,17 @@ Map of steps → files you populate:
   new or discover a better way to do a task.
 - Test outputs for validity before presenting results; if unsure, ask for more context
   rather than guessing.
-<!-- TODO (Step 5): add any rules specific to this agent (e.g. "never send email
-     without showing a preview first"). -->
+- **Never invent gaps or matches.** Report only what the parsed requirements, model, and
+  links actually support. A well-traced model showing high coverage is a valid result — say
+  so honestly rather than manufacturing findings.
+- **Validate every audit before presenting** (see the Validation section in
+  `workflows/traceability-audit.md`): spot-check resolved model elements, sanity-check
+  "missing signals" and orphan counts. Wrong resolutions usually mean a parsing bug — fix it,
+  don't ship it.
+- **Parse locally, no MATLAB.** `.slx`, `.slmx`, and `.docx` are all zipped XML; parse them
+  directly. Do not require MATLAB/Simulink, network access, or connectors.
+- State the build scope when presenting results: the current tool covers **tasks 1–4**
+  (parse → match → flag). ASIL/ASPICE compliance, prioritization, and NL Q&A are not built yet.
 
 # Project Structure
 <!-- Defaults below. Add a line for any new folder you introduce. -->
@@ -129,11 +177,16 @@ Map of steps → files you populate:
 - `resources/` — Reference material provided to the agent (templates, sample data).
 - `tests/` — Quick checks that confirm tools and outputs are correct.
 - `docs/` — Setup and help documentation.
-<!-- TODO (Step 5): note any agent-specific folders or files here. -->
+- `tools/trace_audit.py` — the traceability audit engine (parse → match → flag → dashboard).
+  Pure Python 3 standard library; run with no args for the ACC example, or `--req/--model/--links`.
+- `resources/ACC (Adaptive Cruise Control)/` — the worked ACC example: `Requirement.docx`,
+  `ACC_Project.slx`, `ACC_Project.slmx` (plus generated code and Model Advisor reports).
+- `resources/*.docx` — standards/rulebooks (ASIL classification, ISO 26262/ASPICE guidelines,
+  program-stage taxonomy) used by the planned compliance/prioritization steps.
 
 # How to handle requests
-<!-- TODO (Step 5, optional): once you have several workflows, list the keywords or
-     request types that should route to each workflow, so the agent picks the right
-     recipe quickly. Example:
-       - "weekly report", "summary" → workflows/weekly-report.md
--->
+- "traceability audit", "check the model against requirements", "which requirements aren't
+  in the model?", "orphan logic", "coverage", "generate the dashboard"
+  → `workflows/traceability-audit.md` (runs `tools/trace_audit.py`).
+- Questions about a past audit's numbers (coverage, a specific requirement's status) can be
+  answered from `output/ACC_traceability_matrix.json` without re-running.

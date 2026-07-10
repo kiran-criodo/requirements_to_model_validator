@@ -10,7 +10,8 @@ rule, or a better way to do something, it should save it here and add a pointer 
 <!-- Add one line per memory file, like:
 - [Business terms](business-terms.md) — what our internal words mean
 -->
-_(none yet)_
+- [Simulink parsing notes](simulink-parsing-notes.md) — how .slx/.slmx/.docx are parsed, the
+  containment trick, Stateflow/SID gotchas, and the two ACC requirement docs.
 
 ## Personal memories (kept private, not shared)
 Files named `local_*.md` are personal to you and are never shared. Copy

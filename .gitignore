@@ -24,6 +24,14 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+~$*
+
+# ---- Simulink generated build artifacts (regenerated from the .slx) ----
+slprj/
+*_ert_rtw/
+*.exe
+*.obj
+*.slxc
 
 # ---- Claude Code local state ----
 .claude/
