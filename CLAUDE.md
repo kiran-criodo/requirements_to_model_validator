@@ -139,8 +139,12 @@ directly as zipped XML; `.docx` as zipped XML.
 (coverage %, matched/gap/orphan/partial breakdown, per-requirement drill-down), plus the
 underlying traceability matrix data.
 
-**Current build status.** Workflow 1 = tasks 1–4 (parse → match → flag) rendered to the HTML
-dashboard. Compliance cross-check, ASIL×stage prioritization, and NL Q&A are planned grow steps.
+**Current build status.**
+- Workflow 1 (tasks 1–4): parse → match → flag → HTML traceability dashboard. `tools/trace_audit.py`.
+- Workflow 2 (tasks 5–6): ASIL classification, ISO 26262-6 Part 6 trace-chain check, ASPICE
+  SWE.1–6 status, and ASIL×program-stage prioritized punch-list. `tools/compliance_audit.py`.
+- Planned: natural-language Q&A over the JSON outputs (task 7); wiring explicit ASIL/Type tags
+  when the requirements source carries them (e.g. a REQ-ACC table).
 
 # Rules
 <!-- Sensible defaults below — keep them. Add agent-specific rules under "TODO". -->
@@ -179,6 +183,8 @@ dashboard. Compliance cross-check, ASIL×stage prioritization, and NL Q&A are pl
 - `docs/` — Setup and help documentation.
 - `tools/trace_audit.py` — the traceability audit engine (parse → match → flag → dashboard).
   Pure Python 3 standard library; run with no args for the ACC example, or `--req/--model/--links`.
+- `tools/compliance_audit.py` — ASIL / ISO 26262 / ASPICE compliance cross-check + prioritized
+  punch-list. Reuses `trace_audit.py`; `--stage N` overrides the auto-detected program stage.
 - `resources/ACC (Adaptive Cruise Control)/` — the worked ACC example: `Requirement.docx`,
   `ACC_Project.slx`, `ACC_Project.slmx` (plus generated code and Model Advisor reports).
 - `resources/*.docx` — standards/rulebooks (ASIL classification, ISO 26262/ASPICE guidelines,
@@ -188,5 +194,9 @@ dashboard. Compliance cross-check, ASIL×stage prioritization, and NL Q&A are pl
 - "traceability audit", "check the model against requirements", "which requirements aren't
   in the model?", "orphan logic", "coverage", "generate the dashboard"
   → `workflows/traceability-audit.md` (runs `tools/trace_audit.py`).
-- Questions about a past audit's numbers (coverage, a specific requirement's status) can be
-  answered from `output/ACC_traceability_matrix.json` without re-running.
+- "compliance", "ASIL", "ISO 26262", "ASPICE", "SWE.x", "punch-list", "are the safety reqs
+  verified?", "program stage", "prioritized findings"
+  → `workflows/compliance-audit.md` (runs `tools/compliance_audit.py`).
+- Questions about a past audit's numbers (coverage, a requirement's status, ASIL, priority)
+  can be answered from `output/ACC_traceability_matrix.json` / `output/ACC_compliance_report.json`
+  without re-running.
