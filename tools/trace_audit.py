@@ -38,10 +38,11 @@ def _strip_tags(xml: str) -> str:
 # --------------------------------------------------------------------------- #
 # Task 1 — parse requirements
 # --------------------------------------------------------------------------- #
-# Matches headings like "Requirement 1– Lead Vehicle:" or
-# "Requirement 3c (i) – LeadVehicle_Detected_Follow (ACC ON MODE):"
+# Matches headings like "Requirement 1– Lead Vehicle:",
+# "Requirement 3c (i) – LeadVehicle_Detected_Follow (ACC ON MODE):", and the
+# VDD dash-before-number / no-title shape "Requirement - 1:" / "Requirement – 2:".
 _REQ_HEADING = re.compile(
-    r"^Requirement\s+([0-9]+[a-z]?(?:\s*\([ivx]+\))?)\s*[–\-:]\s*(.*?)\s*:?\s*$",
+    r"^Requirement\s*[–\-]?\s*([0-9]+[a-z]?(?:\s*\([ivx]+\))?)\s*[–\-:]\s*(.*?)\s*:?\s*$",
     re.IGNORECASE,
 )
 
@@ -122,8 +123,40 @@ def parse_requirements(docx_path: str):
             cur["body_lines"].append(ln.strip())
     for r in reqs:
         r["text"] = " ".join([r["title"]] + r["body_lines"]).strip()
+        # Headings with no inline title (e.g. VDD "Requirement - 1:") — derive a short
+        # title from the first sentence of the body so the dashboard reads sensibly.
+        if not r["title"]:
+            r["title"] = re.split(r"(?<=[a-z0-9])[.;] ", r["text"])[0][:90] if r["text"] else r["id_display"]
         del r["body_lines"]
     return reqs
+
+
+# --------------------------------------------------------------------------- #
+# Data dictionary (.sldd) — calibration parameters / signals defined outside the
+# model, e.g. VDD's MP_VDD.sldd. Entries look like:
+#   <Object Class="DD.ENTRY"><P Name="Name" Class="char">Left_Turn_AngularLimit</P>…
+# We collect every DD.ENTRY name so requirement-named calibrations resolve to a
+# real design artifact instead of being reported as missing.
+# --------------------------------------------------------------------------- #
+def parse_data_dictionary(slx_path: str):
+    """Return the set of names defined in any .sldd sibling of the model."""
+    names = set()
+    folder = os.path.dirname(os.path.abspath(slx_path))
+    if not os.path.isdir(folder):
+        return names
+    for fn in os.listdir(folder):
+        if not fn.lower().endswith(".sldd"):
+            continue
+        try:
+            xml = _read_zip_member(os.path.join(folder, fn),
+                                   lambda n: n.endswith(".xml") and "data" in n)
+        except Exception:
+            continue
+        for obj in re.findall(r'<Object Class="DD\.ENTRY">(.*?)</Object>', xml, re.S):
+            m = re.search(r'<P Name="Name"[^>]*>([^<]+)</P>', obj)
+            if m:
+                names.add(html.unescape(m.group(1)).strip())
+    return names
 
 
 # --------------------------------------------------------------------------- #
@@ -192,6 +225,8 @@ def parse_model(slx_path: str):
         "states": states,          # ssid -> name
         "sid_index": sid_index,
         "parent_of": parent_of,
+        "block_names": {b["name"] for b in blocks},   # every block, incl. Constants
+        "dict_names": parse_data_dictionary(slx_path), # .sldd calibrations/signals
     }
 
 
@@ -282,6 +317,21 @@ def audit(reqs, model, links):
                     + [b["name"] for b in model["subsystems"]]
                     + sorted(model["states"].values()))
 
+    # An identifier is "defined" in the design if it names any signal, subsystem,
+    # state, block (incl. Constants), or a data-dictionary (.sldd) entry. Match is
+    # suffix-tolerant so a requirement's "Left_Turn_AngularLimit" resolves to the
+    # model's Simulink-suffixed "Left_Turn_AngularLimit1".
+    def _strip_suffix(s):
+        return re.sub(r"\d+$", "", s.lower())
+    defined_lower = set(model_signal_lower) | set(name_pool)
+    for nm in list(model["block_names"]) + list(model["dict_names"]):
+        defined_lower.add(nm.lower())
+        defined_lower.add(_strip_suffix(nm))
+
+    def _is_defined(ident):
+        il = ident.lower()
+        return il in defined_lower or _strip_suffix(ident) in defined_lower
+
     results = []
     for r in reqs:
         rtokens = _tokens(r["text"])
@@ -292,13 +342,12 @@ def audit(reqs, model, links):
             idents.add(declared)
         mentioned = sorted({model_signal_lower[i.lower()] for i in idents
                             if i.lower() in model_signal_lower})
-        # Named like a signal (underscore + a capital) but absent as a signal,
-        # a subsystem, or a Stateflow state -> genuinely missing from the model.
+        # Named like a signal (underscore + a capital) but not defined anywhere in
+        # the design (signal, subsystem, state, block, or data dictionary) -> genuinely
+        # missing from the model.
         missing_signals = sorted({
             i for i in idents
-            if "_" in i and any(c.isupper() for c in i)
-            and i.lower() not in model_signal_lower
-            and i.lower() not in name_pool
+            if "_" in i and any(c.isupper() for c in i) and not _is_defined(i)
         })
 
         evidence, target, confidence = None, None, None

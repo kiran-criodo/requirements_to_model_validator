@@ -79,7 +79,20 @@ def classify_asil(req):
     if any(k in full for k in safety_kw):
         return "ASIL B", ("Longitudinal gap/speed-control path — ASIL B per ISO 26262-3 "
                           "worked ACC classification (S2/E4/C2).")
-    return "ASIL B", "Part of the ASIL B ACC function (feature-level allocation)."
+    # Advisory / indicator-only function with no actuation authority. Per the ASIL
+    # classification standard's worked verdict this is S0/C0 -> QM (e.g. VDD Vehicle
+    # Direction Determination, HA-LCA display-mode arbitration).
+    actuation_kw = ("throttle", "brake", "torque", "decel", "accel", "actuat", "clutch")
+    advisory_kw = ("indicator", "display", "road sign", "roadsign", "status",
+                   "direction", "informational", "advisory", "cluster", "hmi")
+    if not any(k in full for k in actuation_kw) and any(k in full for k in advisory_kw):
+        return "QM", ("Advisory / indicator-only output with no actuation authority — QM per "
+                      "the ASIL standard's worked S0/C0 classification (S0 advisory indicator, "
+                      "C0 driver retains full control).")
+    # Untagged requirement with no applicable rule in the ASIL standard's worked
+    # examples — do NOT assume a level; flag for a project-specific hazard analysis.
+    return "Undetermined", ("No explicit ASIL tag and no matching rule in the ASIL "
+                            "classification standard — requires a project HARA to allocate.")
 
 
 # --------------------------------------------------------------------------- #
@@ -213,16 +226,16 @@ def build_punchlist(rows, orphans, art, stage):
                        + " and re-run the trace audit."),
         })
 
-    # 2) Orphan logic on/near the safety path.
+    # 2) Orphan logic — model elements with no requirement link.
     for o in orphans["functional"] + orphans["structural"]:
-        w = 2  # unclassified orphan on an ASIL B feature
+        w = 2  # unclassified orphan — weight independent of feature ASIL
         score = w * 2 + (2 if late else 1)
         items.append({
             "score": score, "asil": "unclassified",
             "title": f"Orphan logic: {o['name']} ({o['type']})",
             "detail": ("Model element with no requirement link (SID "
-                       f"{o['sid']}). On an ASIL B feature, untraced logic must be "
-                       "justified or linked."),
+                       f"{o['sid']}). Untraced logic must be justified or linked per "
+                       "ISO 26262-6 / ASPICE SWE.2 bidirectional traceability."),
             "requirements": [],
             "action": "Link to a requirement or document as intentionally untraced.",
         })
