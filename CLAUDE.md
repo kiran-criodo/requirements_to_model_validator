@@ -194,6 +194,9 @@ underlying traceability matrix data.
   punch-list. Reuses `trace_audit.py`; `--stage N` overrides the auto-detected program stage.
 - `tools/ask.py` — grounded Q&A over `output/*.json` (filters like `--asil/--status/--unverified/
   --search/--req/--punchlist/--aspice/--orphans`, or `-q "free text"`).
+- `tools/send_email.py` — deliver a report by email (SMTP, stdlib). Reads `SMTP_*` creds from
+  `.env` only; supports `--attach` (repeatable), `--body-file`, and `--dry-run`. See
+  `workflows/send-email.md`.
 - `resources/ACC (Adaptive Cruise Control)/` — the worked ACC example: `Requirement.docx`,
   `ACC_Project.slx`, `ACC_Project.slmx` (plus generated code and Model Advisor reports).
 - `resources/*.docx` — standards/rulebooks (ASIL classification, ISO 26262/ASPICE guidelines,
@@ -209,3 +212,6 @@ underlying traceability matrix data.
 - Any conversational question about the results ("which ASIL B reqs aren't verified?", "which
   requirements aren't in the model?", "what's the ASPICE status?") → `workflows/ask-questions.md`
   (use `tools/ask.py` to stay grounded; never answer audit numbers from memory).
+- "email/send/mail the report(s) to <someone>", "send the dashboard to the safety lead"
+  → `workflows/send-email.md` (runs `tools/send_email.py`). Confirm recipient + attachments
+  first; needs `SMTP_*` in `.env` (Gmail → App Password) or the authorized Gmail connector.
