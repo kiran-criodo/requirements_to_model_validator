@@ -202,6 +202,27 @@ def build_punchlist(rows, orphans, art, stage):
             "action": "Implement in the model, then establish requirement→model traceability.",
         })
 
+    # 0b) Requirements that ARE mapped to a subsystem but whose implementation is
+    #     incomplete — an input the requirement depends on is left unconnected. Block
+    #     presence + requirement links look complete, so this is easy to miss at review.
+    incomplete = [r for r in rows if r["status"] == "Partial" and r.get("unconnected_inputs")]
+    by_asil = {}
+    for r in incomplete:
+        by_asil.setdefault(r["asil"], []).append(r)
+    for asil, group in sorted(by_asil.items(), key=lambda kv: -ASIL_WEIGHT.get(kv[0], 0)):
+        w = ASIL_WEIGHT.get(asil, 0)
+        score = w * 4 + 2 + (2 if late else 0)   # nearly as severe as a full gap
+        sigs = sorted({s for r in group for s in r.get("unconnected_inputs", [])})
+        items.append({
+            "score": score, "asil": asil,
+            "title": f"{len(group)} {asil} requirement(s) with incomplete implementation",
+            "detail": ("Mapped to a subsystem but with unconnected input signal(s): "
+                       + ", ".join(sigs) + ". The requirement's logic cannot function until "
+                       "these are wired — block presence and requirement links alone hide this."),
+            "requirements": [g["id_display"] for g in group],
+            "action": "Connect the missing input signal(s) inside the subsystem, then re-run the audit.",
+        })
+
     # 1) Missing verification linkage — for requirements that ARE implemented.
     unverified = [r for r in rows if r["status"] in ("Matched", "Partial")
                   and not r["chain"].get("Design ↔ Verification")

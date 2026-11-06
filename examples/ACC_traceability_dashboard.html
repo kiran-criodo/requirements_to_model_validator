@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ACC_Project — Traceability Audit</title>
+<style>
+:root{
+  --bg:#f4f6f8; --surface:#ffffff; --surface-2:#eef1f5; --border:#d7dce4;
+  --text:#1a2030; --text-dim:#59627a; --accent:#2f6f8f;
+  --good:#1f9d57; --warn:#c0801a; --bad:#cf4557; --orphan:#6d6a9c;
+  --good-bg:#e7f5ec; --warn-bg:#f8efdc; --bad-bg:#fae6e9; --orphan-bg:#eceafa;
+  --shadow:0 1px 2px rgba(20,30,50,.06),0 4px 16px rgba(20,30,50,.05);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1319; --surface:#161b23; --surface-2:#1e2632; --border:#2a323f;
+  --text:#e7ebf2; --text-dim:#96a0b2; --accent:#5aa9cf;
+  --good:#37c583; --warn:#e0a844; --bad:#f0687e; --orphan:#9a92e0;
+  --good-bg:#12271d; --warn-bg:#2a2314; --bad-bg:#2c1519; --orphan-bg:#1c1a2e;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
+}}
+:root[data-theme="light"]{
+  --bg:#f4f6f8; --surface:#ffffff; --surface-2:#eef1f5; --border:#d7dce4;
+  --text:#1a2030; --text-dim:#59627a; --accent:#2f6f8f;
+  --good:#1f9d57; --warn:#c0801a; --bad:#cf4557; --orphan:#6d6a9c;
+  --good-bg:#e7f5ec; --warn-bg:#f8efdc; --bad-bg:#fae6e9; --orphan-bg:#eceafa;
+  --shadow:0 1px 2px rgba(20,30,50,.06),0 4px 16px rgba(20,30,50,.05);
+}
+:root[data-theme="dark"]{
+  --bg:#0f1319; --surface:#161b23; --surface-2:#1e2632; --border:#2a323f;
+  --text:#e7ebf2; --text-dim:#96a0b2; --accent:#5aa9cf;
+  --good:#37c583; --warn:#e0a844; --bad:#f0687e; --orphan:#9a92e0;
+  --good-bg:#12271d; --warn-bg:#2a2314; --bad-bg:#2c1519; --orphan-bg:#1c1a2e;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  line-height:1.5;-webkit-font-smoothing:antialiased;}
+.mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  font-variant-numeric:tabular-nums;}
+.wrap{max-width:1120px;margin:0 auto;padding:32px 24px 80px;}
+header.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;
+  gap:16px;border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:28px;}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);
+  font-weight:600;margin:0 0 6px;}
+h1{font-size:26px;line-height:1.15;margin:0;font-weight:680;text-wrap:balance;letter-spacing:-.01em;}
+.sub{color:var(--text-dim);font-size:14px;margin:8px 0 0;}
+.meta{text-align:right;color:var(--text-dim);font-size:12.5px;line-height:1.7;}
+.meta b{color:var(--text);font-weight:600;}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:26px;}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:16px 18px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+.tile .lbl{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);font-weight:600;}
+.tile .val{font-size:30px;font-weight:700;margin-top:6px;letter-spacing:-.02em;}
+.tile .note{font-size:12px;color:var(--text-dim);margin-top:2px;}
+.tile.stripe::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;}
+.tile.s-good::before{background:var(--good)} .tile.s-warn::before{background:var(--warn)}
+.tile.s-bad::before{background:var(--bad)} .tile.s-orphan::before{background:var(--orphan)}
+.tile.s-accent::before{background:var(--accent)}
+
+.bar{height:9px;border-radius:6px;background:var(--surface-2);overflow:hidden;display:flex;margin-top:12px;}
+.bar span{display:block;height:100%;}
+.bar .b-good{background:var(--good)} .bar .b-warn{background:var(--warn)} .bar .b-bad{background:var(--bad)}
+
+h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);
+  font-weight:700;margin:36px 0 14px;display:flex;align-items:center;gap:10px;}
+h2::after{content:"";flex:1;height:1px;background:var(--border);}
+
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:-4px 0 16px;font-size:12.5px;color:var(--text-dim);}
+.pill{display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:12px;
+  padding:3px 10px;border-radius:999px;white-space:nowrap;}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;}
+.p-good{color:var(--good);background:var(--good-bg)} .p-good .dot{background:var(--good)}
+.p-warn{color:var(--warn);background:var(--warn-bg)} .p-warn .dot{background:var(--warn)}
+.p-bad{color:var(--bad);background:var(--bad-bg)} .p-bad .dot{background:var(--bad)}
+.p-orphan{color:var(--orphan);background:var(--orphan-bg)} .p-orphan .dot{background:var(--orphan)}
+.p-na{color:var(--text-dim);background:var(--surface-2);border:1px solid var(--border)} .p-na .dot{background:var(--text-dim)}
+
+.tablecard{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  box-shadow:var(--shadow);overflow:hidden;}
+.scroll{overflow-x:auto;}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:720px;}
+thead th{text-align:left;font-size:11px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--text-dim);font-weight:700;padding:12px 14px;border-bottom:1px solid var(--border);
+  background:var(--surface-2);position:sticky;top:0;}
+tbody td{padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr{position:relative;}
+td.stripe{border-left:4px solid transparent;}
+tr.st-Matched td.stripe{border-left-color:var(--good)}
+tr.st-Partial td.stripe{border-left-color:var(--warn)}
+tr.st-Gap td.stripe{border-left-color:var(--bad)}
+tr.st-Process td.stripe{border-left-color:var(--text-dim)}
+.req-id{font-weight:600;font-size:12.5px;color:var(--text)}
+.req-title{color:var(--text-dim);font-size:12.5px;margin-top:2px;}
+.tgt{color:var(--text);} .ev{color:var(--text-dim);font-size:12px;}
+.miss{color:var(--bad);font-size:12px;} .none{color:var(--text-dim);}
+
+details{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  margin-bottom:8px;box-shadow:var(--shadow);overflow:hidden;}
+details[open]{border-color:var(--accent);}
+summary{cursor:pointer;padding:13px 16px;display:flex;align-items:center;gap:12px;
+  list-style:none;font-size:14px;}
+summary::-webkit-details-marker{display:none;}
+summary .chev{color:var(--text-dim);transition:transform .15s;font-size:12px;}
+details[open] summary .chev{transform:rotate(90deg);}
+summary .grow{flex:1;font-weight:600;}
+.detail-body{padding:2px 16px 16px 40px;border-top:1px solid var(--border);}
+.detail-body p{margin:12px 0 6px;font-size:13.5px;color:var(--text);}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:6px 14px;font-size:13px;margin-top:10px;}
+.kv dt{color:var(--text-dim);font-weight:600;}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;}
+.chip{font-size:11.5px;padding:2px 9px;border-radius:6px;background:var(--surface-2);
+  border:1px solid var(--border);color:var(--text-dim);}
+.orphan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;}
+.ocard{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--orphan);
+  border-radius:9px;padding:11px 13px;box-shadow:var(--shadow);}
+.ocard.glue{border-left-color:var(--border);opacity:.9;}
+.ocard .on{font-weight:600;font-size:13px;} .ocard .ot{font-size:11.5px;color:var(--text-dim);margin-top:2px;}
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--border);
+  color:var(--text-dim);font-size:12px;line-height:1.7;}
+.toggle{cursor:pointer;background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+  border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;font-family:inherit;}
+.toggle:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+@media (max-width:560px){.meta{text-align:left}.kv{grid-template-columns:1fr}}
+</style></head><body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="eyebrow">Requirement → Model Traceability</p>
+      <h1>ACC_Project — Traceability Audit</h1>
+      <p class="sub">Requirement.docx &nbsp;↔&nbsp; ACC_Project.slx
+         &nbsp;·&nbsp; ACC_Project.slmx</p>
+    </div>
+    <div class="meta">
+      <button class="toggle" id="themeBtn">◐ Theme</button><br>
+      <span>Generated <b>2026-08-07 10:39 UTC</b></span><br>
+      <span>12 requirements · 64 model blocks · 9 states</span>
+    </div>
+  </header>
+
+  <div class="kpis">
+      <div class="tile stripe s-accent"><div class="lbl">Requirement coverage</div>
+        <div class="val mono">100%</div>
+        <div class="note">12 of 12 implementation requirements traced</div>
+        <div class="bar" role="img" aria-label="coverage breakdown">
+          <span class="b-good" style="width:100.0%"></span>
+          <span class="b-warn" style="width:0.0%"></span>
+          <span class="b-bad" style="width:0.0%"></span>
+        </div></div>
+      <div class="tile stripe s-good"><div class="lbl">Matched</div>
+        <div class="val mono">12</div><div class="note">full trace, signals present</div></div>
+      <div class="tile stripe s-warn"><div class="lbl">Partial</div>
+        <div class="val mono">0</div><div class="note">weak match or missing signals</div></div>
+      <div class="tile stripe s-bad"><div class="lbl">Gaps</div>
+        <div class="val mono">0</div><div class="note">no model implementation</div></div>
+      <div class="tile stripe s-orphan"><div class="lbl">Orphan logic</div>
+        <div class="val mono">1</div><div class="note">1 structural glue blocks</div></div>
+    </div>
+
+  <h2>Traceability matrix</h2>
+  
+      <div class="legend">
+        <span class="pill p-good"><span class="dot"></span>Matched</span>
+        <span class="pill p-warn"><span class="dot"></span>Partial</span>
+        <span class="pill p-bad"><span class="dot"></span>Gap</span>
+        <span class="pill p-orphan"><span class="dot"></span>Orphan logic</span>
+      </div>
+  <div class="tablecard"><div class="scroll"><table>
+    <thead><tr><th>Requirement</th><th>Status</th><th>Model element</th>
+      <th>Evidence</th><th>Signal coverage</th></tr></thead>
+    <tbody>
+        <tr class="st-Matched">
+          <td class="stripe"><div class="req-id mono">Requirement 1</div>
+            <div class="req-title">Lead Vehicle</div></td>
+          <td><span class="pill p-good"><span class="dot"></span>Matched</span></td>
+          <td class="tgt">Requirement1_Lead_Vehicle</td>
+          <td class="ev">Requirement link (.slmx) · high</td>
+          <td><span class="none">—</span></td>
+        </tr>
+        <tr class="st-Matched">
+          <td class="stripe"><div class="req-id mono">Requirement 2</div>
+            <div class="req-title">Drive Vehicle</div></td>
+          <td><span class="pill p-good"><span class="dot"></span>Matched</span></td>
+          <td class="tgt">Requirement2_Drive_Vehicle</td>
+          <td class="ev">Requirement link (.slmx) · high</td>
+          <td><span class="none">—</span></td>
+        </tr>
+        <tr class="st-Matched">
+          <td class="stripe"><div class="req-id mono">Requirement 3</div>
+            <div class="req-title">Adaptive Cruise Control Algorithm</div></td>
+          <td><span class="pill p-good"><span class="dot"></span>Matched</span></td>
+          <td class="tgt">Requirement3_ACC_Algorithm</td>
+          <td class="ev">Requirement link (.slmx) · high</td>
+          <td><span class="none">—</span></td>
+        </tr>
+        <tr class="st-Matched">
+          <td class="stripe"><div class="req-id mono">Requirement 3a</div>
+            <div class="req-title">ACC OFF MODE state logic</div></td>
+          <td><span class="pill p-good"><span class="dot"></span>Matched</span></td>
+          <td class="tgt">ACC_MODE_ALGORITHM / ACC_OFF_MODE</td>
+          <td class="ev">Requirement link (.slmx) · high</td>
+          <td><span class="none">—</span></td>
+        </tr>
+        <tr class="st-Matched">
+          <td class="stripe"><div class="req-id mono">Requirement 3b</div>
+            <div class="req-title">ACC STANDBY MODE state logic</div></td>
+          <td><span class="pill p-good"><span class="dot"></span>Matched</span></td>
+          <td class="tgt">ACC_MODE_ALGORITHM / ACC_STANDBY_MODE</td>
+          <td class="ev">Requirement link (.slmx) · high</td>
+          <td><span class="none">—</span></td>
+        </tr>
+        <tr class="st-Matched">
+          <td class="stripe"><div class="req-id mono">Requirement 3c</div>
+            <div class="req-title">ACC ON MODE state logic</div></td>
+          <td><span class="pill p-good"><span class="dot"></span>Matched</span></td>
+          <td class="tgt">ACC_MODE_ALGORITHM / ACC_ON_MODE</td>
+          <td class="ev">Requirement link (.slmx) · high</td>
+          <td><span class="none">—</span></td>
+        </tr>
+        <tr class="st-Matched">
+          <td class="stripe"><div class="req-id mono">Requirement 3c (i)</div>
+            <div class="req-title">LeadVehicle_Detected_Follow (ACC ON MODE)</div></td>
+          <td><span class="pill p-good"><span class="dot"></span>Matched</span></td>
+          <td class="tgt">ACC_MODE_ALGORITHM / LeadVehicle_Detected_Follow</td>
+          <td class="ev">Requirement link (.slmx) · high</td>
+          <td><span class="none">—</span></td>
+        </tr>
+        <tr class="st-Matched">
+          <td class="stripe"><div class="req-id mono">Requirement 3c (ii)</div>
+            <div class="req-title">LeadVehicle_Not_Detected (ACC ON MODE)</div></td>
+          <td><span class="pill p-good"><span class="dot"></span>Matched</span></td>
+          <td class="tgt">ACC_MODE_ALGORITHM / LeadVehicle_Not_Detected</td>
+          <td class="ev">Requirement link (.slmx) · high</td>
+          <td><span class="none">—</span></td>
+        </tr>
+        <tr class="st-Matched">
+          <td class="stripe"><div class="req-id mono">Requirement 3c (iii)</div>
+            <div class="req-title">LeadVehicle_Detected_Resume (ACC ON MODE)</div></td>
+          <td><span class="pill p-good"><span class="dot"></span>Matched</span></td>
+          <td class="tgt">ACC_MODE_ALGORITHM / LeadVehicle_Detected_Resume</td>
+          <td class="ev">Requirement link (.slmx) · high</td>
+          <td><span class="none">—</span></td>
+        </tr>
+        <tr class="st-Matched">
+          <td class="stripe"><div class="req-id mono">Requirement 3c (iv)</div>
+            <div class="req-title">LeadVehicle_Not_Detected_Resume (ACC ON MODE)</div></td>
+          <td><span class="pill p-good"><span class="dot"></span>Matched</span></td>
+          <td class="tgt">ACC_MODE_ALGORITHM / LeadVehicle_Not_Detected_Resume</td>
+          <td class="ev">Requirement link (.slmx) · high</td>
+          <td><span class="none">—</span></td>
+        </tr>
+        <tr class="st-Matched">
+          <td class="stripe"><div class="req-id mono">Requirement 3c (v)</div>
+            <div class="req-title">LeadVehicle_Speed_lessthan_Set_Speed (ACC ON MODE)</div></td>
+          <td><span class="pill p-good"><span class="dot"></span>Matched</span></td>
+          <td class="tgt">ACC_MODE_ALGORITHM / LeadVehicle_Speed_lessthan_Set_Speed</td>
+          <td class="ev">Requirement link (.slmx) · high</td>
+          <td><span class="none">—</span></td>
+        </tr>
+        <tr class="st-Matched">
+          <td class="stripe"><div class="req-id mono">Requirement 3c (vi)</div>
+            <div class="req-title">LeadVehicle_Speed_equal_Set_Speed (ACC ON MODE)</div></td>
+          <td><span class="pill p-good"><span class="dot"></span>Matched</span></td>
+          <td class="tgt">ACC_MODE_ALGORITHM / LeadVehicle_Speed_equal_Set_Speed</td>
+          <td class="ev">Requirement link (.slmx) · high</td>
+          <td><span class="none">—</span></td>
+        </tr></tbody>
+  </table></div></div>
+
+  <h2>Orphan logic — model elements with no traced requirement</h2>
+  <div class="orphan-grid"><div class="ocard"><div class="on mono">Adaptive_Cruise_Control</div><div class="ot">SubSystem · SID 79 · no requirement traced</div></div><div class="ocard glue"><div class="on mono">Unit Delay</div><div class="ot">UnitDelay · SID 103 · structural glue</div></div></div>
+
+  <h2>Per-requirement detail</h2>
+  
+        <details>
+          <summary><span class="chev">▶</span>
+            <span class="grow mono">Requirement 1 — Lead Vehicle</span>
+            <span class="pill p-good"><span class="dot"></span>Matched</span></summary>
+          <div class="detail-body">
+            <p>Lead Vehicle Lead Vehicle is a vehicle which is driving in the road ahead of our drive vehicle. Two input signals (Signal Name: CameraInput_LeadVehicle &amp; RadarInput_LeadVehicle). Ideally sensor fusion techniques will be deployed to process &amp; analyze data from camera &amp; radar. For complexity reasons, let’s not adapt to any such algorithms. We can simply add both the radar &amp; camera inputs &amp; the corresponding output is read as Speed profile output (Signal Name: LeadVehicle_Speed). Speed data of the lead vehicle is critical in implementing the Adaptive Cruise Control algorithm.</p>
+            <dl class="kv">
+              <dt>Model element</dt><dd class="tgt">Requirement1_Lead_Vehicle</dd>
+              <dt>Evidence</dt><dd>Requirement link (.slmx) · high</dd>
+              <dt>Signals present</dt><dd><div class="chips"><span class="chip">CameraInput_LeadVehicle</span><span class="chip">LeadVehicle_Speed</span><span class="chip">RadarInput_LeadVehicle</span></div></dd>
+              <dt>Signals missing</dt><dd><div class="chips"><span class="none">none</span></div></dd>
+            </dl>
+          </div>
+        </details>
+        <details>
+          <summary><span class="chev">▶</span>
+            <span class="grow mono">Requirement 2 — Drive Vehicle</span>
+            <span class="pill p-good"><span class="dot"></span>Matched</span></summary>
+          <div class="detail-body">
+            <p>Drive Vehicle Drive Vehicle is the vehicle driven by the user &amp; this is the vehicle which has ACC algorithm in it. Like the Lead Vehicle, Drive Vehicle algorithm also has 2 input signals (Signal Name: CameraInput_DriveVehicle, RadarInput_DriveVehicle) &amp; one signal coming as an Input to this subsystem (Signal Name: Acceleration_Mode) – three inputs into this requirement in total. Like the above requirement, sensor fusion techniques will also be deployed here, for complexity reasons we are ignoring them. Two output signals come from this subsystem (Signal Name: DriveVehicle_Speed &amp; LeadVehicle_Detected). Signal DriveVehicle_Speed is summation of three input signals mentioned above &amp; LeadVehicle_Detected is renamed from Input Signal RadarInput_DriveVehicle by mere use of Signal Conversion block.</p>
+            <dl class="kv">
+              <dt>Model element</dt><dd class="tgt">Requirement2_Drive_Vehicle</dd>
+              <dt>Evidence</dt><dd>Requirement link (.slmx) · high</dd>
+              <dt>Signals present</dt><dd><div class="chips"><span class="chip">Acceleration_Mode</span><span class="chip">CameraInput_DriveVehicle</span><span class="chip">DriveVehicle_Speed</span><span class="chip">LeadVehicle_Detected</span><span class="chip">RadarInput_DriveVehicle</span></div></dd>
+              <dt>Signals missing</dt><dd><div class="chips"><span class="none">none</span></div></dd>
+            </dl>
+          </div>
+        </details>
+        <details>
+          <summary><span class="chev">▶</span>
+            <span class="grow mono">Requirement 3 — Adaptive Cruise Control Algorithm</span>
+            <span class="pill p-good"><span class="dot"></span>Matched</span></summary>
+          <div class="detail-body">
+            <p>Adaptive Cruise Control Algorithm Adaptive Cruise Control feature has 3 major modes of operation: OFF Mode, STANDBY Mode &amp; ON Mode. This particular requirement has to be implemented as state machine logic in Simulink. The input signals to this state machine system are (Signal Name: Time_Gap, Set_Speed, Set_Gap, CruiseSwitch, SetSwitch). Also, the output signals (Signal Name: DriveVehicle_Speed &amp; LeadVehicle_Detected) from requirement-2 is fed back as an input signal into this state machine block. Additionally, output signal (Signal Name: LeadVehicle_Speed) from requirement-1 is given as an input signal to this state machine block as well. Output from this subsystem is a signal (Signal Name: Acceleration_Mode) which governs the vehicular speed of the drive vehicle which automatically adjusts its speed &amp; velocity to match the lead vehicle.</p>
+            <dl class="kv">
+              <dt>Model element</dt><dd class="tgt">Requirement3_ACC_Algorithm</dd>
+              <dt>Evidence</dt><dd>Requirement link (.slmx) · high</dd>
+              <dt>Signals present</dt><dd><div class="chips"><span class="chip">Acceleration_Mode</span><span class="chip">CruiseSwitch</span><span class="chip">DriveVehicle_Speed</span><span class="chip">LeadVehicle_Detected</span><span class="chip">LeadVehicle_Speed</span><span class="chip">SetSwitch</span><span class="chip">Set_Gap</span><span class="chip">Set_Speed</span><span class="chip">Time_Gap</span></div></dd>
+              <dt>Signals missing</dt><dd><div class="chips"><span class="none">none</span></div></dd>
+            </dl>
+          </div>
+        </details>
+        <details>
+          <summary><span class="chev">▶</span>
+            <span class="grow mono">Requirement 3a — ACC OFF MODE state logic</span>
+            <span class="pill p-good"><span class="dot"></span>Matched</span></summary>
+          <div class="detail-body">
+            <p>ACC OFF MODE state logic This is the default state inside state machine logic. Output signal Acceleration_Mode is at value 0 in this state. This state is governed by input signal CruiseSwitch. If CruiseSwitch is equal to 1, state ACC STANDBY mode will get activated. If CruiseSwitch is equal to 0, state ACC OFF mode will get activated, from either ACC ON mode or ACC STANDBY mode</p>
+            <dl class="kv">
+              <dt>Model element</dt><dd class="tgt">ACC_MODE_ALGORITHM / ACC_OFF_MODE</dd>
+              <dt>Evidence</dt><dd>Requirement link (.slmx) · high</dd>
+              <dt>Signals present</dt><dd><div class="chips"><span class="chip">Acceleration_Mode</span><span class="chip">CruiseSwitch</span></div></dd>
+              <dt>Signals missing</dt><dd><div class="chips"><span class="none">none</span></div></dd>
+            </dl>
+          </div>
+        </details>
+        <details>
+          <summary><span class="chev">▶</span>
+            <span class="grow mono">Requirement 3b — ACC STANDBY MODE state logic</span>
+            <span class="pill p-good"><span class="dot"></span>Matched</span></summary>
+          <div class="detail-body">
+            <p>ACC STANDBY MODE state logic This is the second activated state inside state machine logic. Output signal Acceleration_Mode is at value 1 in this state. This state is governed by both input signals CruiseSwitch &amp; SetSwitch. If CruiseSwitch is equal to 1, state ACC STANDBY mode will get activated. If CruiseSwitch is equal to 0, state ACC OFF mode will get activated, from either ACC ON mode or ACC STANDBY mode If SetSwitch is equal to 1, state ACC ON mode will get activated. If SetSwitch is equal to 0, state ACC STANDBY mode will get activated.</p>
+            <dl class="kv">
+              <dt>Model element</dt><dd class="tgt">ACC_MODE_ALGORITHM / ACC_STANDBY_MODE</dd>
+              <dt>Evidence</dt><dd>Requirement link (.slmx) · high</dd>
+              <dt>Signals present</dt><dd><div class="chips"><span class="chip">Acceleration_Mode</span><span class="chip">CruiseSwitch</span><span class="chip">SetSwitch</span></div></dd>
+              <dt>Signals missing</dt><dd><div class="chips"><span class="none">none</span></div></dd>
+            </dl>
+          </div>
+        </details>
+        <details>
+          <summary><span class="chev">▶</span>
+            <span class="grow mono">Requirement 3c — ACC ON MODE state logic</span>
+            <span class="pill p-good"><span class="dot"></span>Matched</span></summary>
+          <div class="detail-body">
+            <p>ACC ON MODE state logic This state will be activated when input signal SetSwitch is equal to 1. There are 6 sub states to this state logic: They are: LeadVehicle_Detected_Follow (Default) LeadVehicle_Not_Detected LeadVehicle_Detected_Resume LeadVehicle_Not_Detected_Resume LeadVehicle_Speed_lessthan_Set_Speed LeadVehicle_Speed_equal_Set_Speed</p>
+            <dl class="kv">
+              <dt>Model element</dt><dd class="tgt">ACC_MODE_ALGORITHM / ACC_ON_MODE</dd>
+              <dt>Evidence</dt><dd>Requirement link (.slmx) · high</dd>
+              <dt>Signals present</dt><dd><div class="chips"><span class="chip">SetSwitch</span></div></dd>
+              <dt>Signals missing</dt><dd><div class="chips"><span class="none">none</span></div></dd>
+            </dl>
+          </div>
+        </details>
+        <details>
+          <summary><span class="chev">▶</span>
+            <span class="grow mono">Requirement 3c (i) — LeadVehicle_Detected_Follow (ACC ON MODE)</span>
+            <span class="pill p-good"><span class="dot"></span>Matched</span></summary>
+          <div class="detail-body">
+            <p>LeadVehicle_Detected_Follow (ACC ON MODE) This is the default sub state inside ACC ON MODE state. Output signal Acceleration_Mode is equal to 2. Condition to transit from LeadVehicle_Detected_Follow to LeadVehicle_Not_Detected; Input signal condition LeadVehicle_Detected == 0. Condition to transit from LeadVehicle_Detected_Follow to LeadVehicle_Speed_lessthan_Set_Speed; Input Signals condition (LeadVehicle_Detected == 1) &amp;&amp; (LeadVehicle_Speed &lt; Set_Speed) || (Time_Gap &lt; Set_Gap).</p>
+            <dl class="kv">
+              <dt>Model element</dt><dd class="tgt">ACC_MODE_ALGORITHM / LeadVehicle_Detected_Follow</dd>
+              <dt>Evidence</dt><dd>Requirement link (.slmx) · high</dd>
+              <dt>Signals present</dt><dd><div class="chips"><span class="chip">Acceleration_Mode</span><span class="chip">LeadVehicle_Detected</span><span class="chip">LeadVehicle_Speed</span><span class="chip">Set_Gap</span><span class="chip">Set_Speed</span><span class="chip">Time_Gap</span></div></dd>
+              <dt>Signals missing</dt><dd><div class="chips"><span class="none">none</span></div></dd>
+            </dl>
+          </div>
+        </details>
+        <details>
+          <summary><span class="chev">▶</span>
+            <span class="grow mono">Requirement 3c (ii) — LeadVehicle_Not_Detected (ACC ON MODE)</span>
+            <span class="pill p-good"><span class="dot"></span>Matched</span></summary>
+          <div class="detail-body">
+            <p>LeadVehicle_Not_Detected (ACC ON MODE) Output signal Acceleration_Mode is equal to 1. Condition to transit from LeadVehicle_Not_Detected to LeadVehicle_Detected_Follow; Input signals condition [(LeadVehicle_Detected==1) &amp;&amp; (DriveVehicle_Speed == Set_Speed) &amp;&amp; (LeadVehicle_Speed &gt;= Set_Speed) &amp;&amp; (Time_Gap &gt;= Set_Gap)] Condition to transit from LeadVehicle_Not_Detected to LeadVehicle_Speed_lessthan_Set_Speed; Input signals condition [(LeadVehicle_Detected == 1) &amp;&amp; (LeadVehicle_Speed &lt; Set_Speed) || (Time_Gap &lt; Set_Gap)]</p>
+            <dl class="kv">
+              <dt>Model element</dt><dd class="tgt">ACC_MODE_ALGORITHM / LeadVehicle_Not_Detected</dd>
+              <dt>Evidence</dt><dd>Requirement link (.slmx) · high</dd>
+              <dt>Signals present</dt><dd><div class="chips"><span class="chip">Acceleration_Mode</span><span class="chip">DriveVehicle_Speed</span><span class="chip">LeadVehicle_Detected</span><span class="chip">LeadVehicle_Speed</span><span class="chip">Set_Gap</span><span class="chip">Set_Speed</span><span class="chip">Time_Gap</span></div></dd>
+              <dt>Signals missing</dt><dd><div class="chips"><span class="none">none</span></div></dd>
+            </dl>
+          </div>
+        </details>
+        <details>
+          <summary><span class="chev">▶</span>
+            <span class="grow mono">Requirement 3c (iii) — LeadVehicle_Detected_Resume (ACC ON MODE)</span>
+            <span class="pill p-good"><span class="dot"></span>Matched</span></summary>
+          <div class="detail-body">
+            <p>LeadVehicle_Detected_Resume (ACC ON MODE) Output signal Acceleration_Mode is equal to 3. Condition to transit from LeadVehicle_Detected_Resume to LeadVehicle_Detected_Follow; Input signals condition [(DriveVehicle_Speed == Set_Speed) &amp;&amp; (LeadVehicle_Speed &gt;= Set_Speed) &amp;&amp; (Time_Gap &gt;= Set_Gap)] Condition to transit from LeadVehicle_Detected_Resume to LeadVehicle_Not_Detected_Resume; Input signal condition LeadVehicle_Detected==0. Condition to transit from LeadVehicle_Detected_Resume to LeadVehicle_Speed_equal_Set_Speed; Input Signal condition [(DriveVehicle_Speed &lt; Set_Speed) &amp;&amp; (LeadVehicle_Speed &gt; DriveVehicle_Speed) &amp;&amp; (Time_Gap &gt;= Set_Gap)]</p>
+            <dl class="kv">
+              <dt>Model element</dt><dd class="tgt">ACC_MODE_ALGORITHM / LeadVehicle_Detected_Resume</dd>
+              <dt>Evidence</dt><dd>Requirement link (.slmx) · high</dd>
+              <dt>Signals present</dt><dd><div class="chips"><span class="chip">Acceleration_Mode</span><span class="chip">DriveVehicle_Speed</span><span class="chip">LeadVehicle_Detected</span><span class="chip">LeadVehicle_Speed</span><span class="chip">Set_Gap</span><span class="chip">Set_Speed</span><span class="chip">Time_Gap</span></div></dd>
+              <dt>Signals missing</dt><dd><div class="chips"><span class="none">none</span></div></dd>
+            </dl>
+          </div>
+        </details>
+        <details>
+          <summary><span class="chev">▶</span>
+            <span class="grow mono">Requirement 3c (iv) — LeadVehicle_Not_Detected_Resume (ACC ON MODE)</span>
+            <span class="pill p-good"><span class="dot"></span>Matched</span></summary>
+          <div class="detail-body">
+            <p>LeadVehicle_Not_Detected_Resume (ACC ON MODE) Output signal Acceleration_Mode is equal to 1.</p>
+            <dl class="kv">
+              <dt>Model element</dt><dd class="tgt">ACC_MODE_ALGORITHM / LeadVehicle_Not_Detected_Resume</dd>
+              <dt>Evidence</dt><dd>Requirement link (.slmx) · high</dd>
+              <dt>Signals present</dt><dd><div class="chips"><span class="chip">Acceleration_Mode</span></div></dd>
+              <dt>Signals missing</dt><dd><div class="chips"><span class="none">none</span></div></dd>
+            </dl>
+          </div>
+        </details>
+        <details>
+          <summary><span class="chev">▶</span>
+            <span class="grow mono">Requirement 3c (v) — LeadVehicle_Speed_lessthan_Set_Speed (ACC ON MODE)</span>
+            <span class="pill p-good"><span class="dot"></span>Matched</span></summary>
+          <div class="detail-body">
+            <p>LeadVehicle_Speed_lessthan_Set_Speed (ACC ON MODE) Output signal Acceleration_Mode is equal to 4. Condition to transit from LeadVehicle_Speed_lessthan_Set_Speed to LeadVehicle_Not_Detected; Input signal condition [(LeadVehicle_Detected == 0) &amp;&amp; (DriveVehicle_Speed == Set_Speed)] Condition to transit from LeadVehicle_Speed_lessthan_Set_Speed to LeadVehicle_Speed_equal_Set_Speed; Input signals condition [((LeadVehicle_Speed*1.25&gt;=DriveVehicle_Speed) &amp;&amp; (LeadVehicle_Speed * 0.75&lt;=DriveVehicle_Speed)) &amp;&amp; (DriveVehicle_Speed &lt; Set_Speed) &amp;&amp; ((Time_Gap&lt;=1.25*Set_Gap) &amp;&amp; (Time_Gap &gt;=0.75*Set_Gap))]</p>
+            <dl class="kv">
+              <dt>Model element</dt><dd class="tgt">ACC_MODE_ALGORITHM / LeadVehicle_Speed_lessthan_Set_Speed</dd>
+              <dt>Evidence</dt><dd>Requirement link (.slmx) · high</dd>
+              <dt>Signals present</dt><dd><div class="chips"><span class="chip">Acceleration_Mode</span><span class="chip">DriveVehicle_Speed</span><span class="chip">LeadVehicle_Detected</span><span class="chip">LeadVehicle_Speed</span><span class="chip">Set_Gap</span><span class="chip">Set_Speed</span><span class="chip">Time_Gap</span></div></dd>
+              <dt>Signals missing</dt><dd><div class="chips"><span class="none">none</span></div></dd>
+            </dl>
+          </div>
+        </details>
+        <details>
+          <summary><span class="chev">▶</span>
+            <span class="grow mono">Requirement 3c (vi) — LeadVehicle_Speed_equal_Set_Speed (ACC ON MODE)</span>
+            <span class="pill p-good"><span class="dot"></span>Matched</span></summary>
+          <div class="detail-body">
+            <p>LeadVehicle_Speed_equal_Set_Speed (ACC ON MODE) Output signal Acceleration_Mode is equal to 5. Condition to transit from LeadVehicle_Speed_equal_Set_Speed to LeadVehicle_Not_Detected_Resume; Input signal conditions is [(LeadVehicle_Detected == 0) || (DriveVehicle_Speed &lt;= Set_Speed)] Condition to transit from LeadVehicle_Speed_equal_Set_Speed to LeadVehicle_Detected_Resume; Input signal conditions [(DriveVehicle_Speed &lt; Set_Speed) &amp;&amp; (LeadVehicle_Speed &gt; DriveVehicle_Speed) || (Time_Gap &gt;= Set_Gap)] Condition to transit from LeadVehicle_Speed_equal_Set_Speed to LeadVehicle_Speed_lessthan_Set_Speed; Input signals conditions [(LeadVehicle_Speed&lt;Set_Speed) &amp;&amp; (LeadVehicle_Speed&lt;DriveVehicle_Speed) || (Time_Gap == 0.75*Set_Gap)]</p>
+            <dl class="kv">
+              <dt>Model element</dt><dd class="tgt">ACC_MODE_ALGORITHM / LeadVehicle_Speed_equal_Set_Speed</dd>
+              <dt>Evidence</dt><dd>Requirement link (.slmx) · high</dd>
+              <dt>Signals present</dt><dd><div class="chips"><span class="chip">Acceleration_Mode</span><span class="chip">DriveVehicle_Speed</span><span class="chip">LeadVehicle_Detected</span><span class="chip">LeadVehicle_Speed</span><span class="chip">Set_Gap</span><span class="chip">Set_Speed</span><span class="chip">Time_Gap</span></div></dd>
+              <dt>Signals missing</dt><dd><div class="chips"><span class="none">none</span></div></dd>
+            </dl>
+          </div>
+        </details>
+
+  <footer>
+    <b>Scope:</b> tasks 1–4 (parse → match → flag). Matching uses existing requirement
+    links (.slmx), naming conventions, then signal-overlap similarity.
+    ASIL / ASPICE compliance cross-check and ASIL×program-stage prioritization are
+    planned next steps.<br>
+    Generated by <span class="mono">tools/trace_audit.py</span> — Requirements to Model Validator.
+  </footer>
+</div>
+<script>
+(function(){
+  var root=document.documentElement;
+  var btn=document.getElementById('themeBtn');
+  function cur(){return root.getAttribute('data-theme')||
+    (matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');}
+  btn.addEventListener('click',function(){
+    var next=cur()==='dark'?'light':'dark';
+    root.setAttribute('data-theme',next);
+    btn.textContent=next==='dark'?'\u2600 Light':'\u263e Dark';
+  });
+})();
+</script>
+</body></html>

@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ACC_Project — Compliance & Punch-list</title>
+<style>
+:root{
+  --bg:#f4f6f8; --surface:#ffffff; --surface-2:#eef1f5; --border:#d7dce4;
+  --text:#1a2030; --text-dim:#59627a; --accent:#2f6f8f;
+  --good:#1f9d57; --warn:#c0801a; --bad:#cf4557; --orphan:#6d6a9c;
+  --good-bg:#e7f5ec; --warn-bg:#f8efdc; --bad-bg:#fae6e9; --orphan-bg:#eceafa;
+  --shadow:0 1px 2px rgba(20,30,50,.06),0 4px 16px rgba(20,30,50,.05);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1319; --surface:#161b23; --surface-2:#1e2632; --border:#2a323f;
+  --text:#e7ebf2; --text-dim:#96a0b2; --accent:#5aa9cf;
+  --good:#37c583; --warn:#e0a844; --bad:#f0687e; --orphan:#9a92e0;
+  --good-bg:#12271d; --warn-bg:#2a2314; --bad-bg:#2c1519; --orphan-bg:#1c1a2e;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
+}}
+:root[data-theme="light"]{
+  --bg:#f4f6f8; --surface:#ffffff; --surface-2:#eef1f5; --border:#d7dce4;
+  --text:#1a2030; --text-dim:#59627a; --accent:#2f6f8f;
+  --good:#1f9d57; --warn:#c0801a; --bad:#cf4557; --orphan:#6d6a9c;
+  --good-bg:#e7f5ec; --warn-bg:#f8efdc; --bad-bg:#fae6e9; --orphan-bg:#eceafa;
+  --shadow:0 1px 2px rgba(20,30,50,.06),0 4px 16px rgba(20,30,50,.05);
+}
+:root[data-theme="dark"]{
+  --bg:#0f1319; --surface:#161b23; --surface-2:#1e2632; --border:#2a323f;
+  --text:#e7ebf2; --text-dim:#96a0b2; --accent:#5aa9cf;
+  --good:#37c583; --warn:#e0a844; --bad:#f0687e; --orphan:#9a92e0;
+  --good-bg:#12271d; --warn-bg:#2a2314; --bad-bg:#2c1519; --orphan-bg:#1c1a2e;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  line-height:1.5;-webkit-font-smoothing:antialiased;}
+.mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  font-variant-numeric:tabular-nums;}
+.wrap{max-width:1120px;margin:0 auto;padding:32px 24px 80px;}
+header.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;
+  gap:16px;border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:28px;}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);
+  font-weight:600;margin:0 0 6px;}
+h1{font-size:26px;line-height:1.15;margin:0;font-weight:680;text-wrap:balance;letter-spacing:-.01em;}
+.sub{color:var(--text-dim);font-size:14px;margin:8px 0 0;}
+.meta{text-align:right;color:var(--text-dim);font-size:12.5px;line-height:1.7;}
+.meta b{color:var(--text);font-weight:600;}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:26px;}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:16px 18px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+.tile .lbl{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);font-weight:600;}
+.tile .val{font-size:30px;font-weight:700;margin-top:6px;letter-spacing:-.02em;}
+.tile .note{font-size:12px;color:var(--text-dim);margin-top:2px;}
+.tile.stripe::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;}
+.tile.s-good::before{background:var(--good)} .tile.s-warn::before{background:var(--warn)}
+.tile.s-bad::before{background:var(--bad)} .tile.s-orphan::before{background:var(--orphan)}
+.tile.s-accent::before{background:var(--accent)}
+
+.bar{height:9px;border-radius:6px;background:var(--surface-2);overflow:hidden;display:flex;margin-top:12px;}
+.bar span{display:block;height:100%;}
+.bar .b-good{background:var(--good)} .bar .b-warn{background:var(--warn)} .bar .b-bad{background:var(--bad)}
+
+h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);
+  font-weight:700;margin:36px 0 14px;display:flex;align-items:center;gap:10px;}
+h2::after{content:"";flex:1;height:1px;background:var(--border);}
+
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:-4px 0 16px;font-size:12.5px;color:var(--text-dim);}
+.pill{display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:12px;
+  padding:3px 10px;border-radius:999px;white-space:nowrap;}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;}
+.p-good{color:var(--good);background:var(--good-bg)} .p-good .dot{background:var(--good)}
+.p-warn{color:var(--warn);background:var(--warn-bg)} .p-warn .dot{background:var(--warn)}
+.p-bad{color:var(--bad);background:var(--bad-bg)} .p-bad .dot{background:var(--bad)}
+.p-orphan{color:var(--orphan);background:var(--orphan-bg)} .p-orphan .dot{background:var(--orphan)}
+.p-na{color:var(--text-dim);background:var(--surface-2);border:1px solid var(--border)} .p-na .dot{background:var(--text-dim)}
+
+.tablecard{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  box-shadow:var(--shadow);overflow:hidden;}
+.scroll{overflow-x:auto;}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:720px;}
+thead th{text-align:left;font-size:11px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--text-dim);font-weight:700;padding:12px 14px;border-bottom:1px solid var(--border);
+  background:var(--surface-2);position:sticky;top:0;}
+tbody td{padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr{position:relative;}
+td.stripe{border-left:4px solid transparent;}
+tr.st-Matched td.stripe{border-left-color:var(--good)}
+tr.st-Partial td.stripe{border-left-color:var(--warn)}
+tr.st-Gap td.stripe{border-left-color:var(--bad)}
+tr.st-Process td.stripe{border-left-color:var(--text-dim)}
+.req-id{font-weight:600;font-size:12.5px;color:var(--text)}
+.req-title{color:var(--text-dim);font-size:12.5px;margin-top:2px;}
+.tgt{color:var(--text);} .ev{color:var(--text-dim);font-size:12px;}
+.miss{color:var(--bad);font-size:12px;} .none{color:var(--text-dim);}
+
+details{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  margin-bottom:8px;box-shadow:var(--shadow);overflow:hidden;}
+details[open]{border-color:var(--accent);}
+summary{cursor:pointer;padding:13px 16px;display:flex;align-items:center;gap:12px;
+  list-style:none;font-size:14px;}
+summary::-webkit-details-marker{display:none;}
+summary .chev{color:var(--text-dim);transition:transform .15s;font-size:12px;}
+details[open] summary .chev{transform:rotate(90deg);}
+summary .grow{flex:1;font-weight:600;}
+.detail-body{padding:2px 16px 16px 40px;border-top:1px solid var(--border);}
+.detail-body p{margin:12px 0 6px;font-size:13.5px;color:var(--text);}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:6px 14px;font-size:13px;margin-top:10px;}
+.kv dt{color:var(--text-dim);font-weight:600;}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;}
+.chip{font-size:11.5px;padding:2px 9px;border-radius:6px;background:var(--surface-2);
+  border:1px solid var(--border);color:var(--text-dim);}
+.orphan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;}
+.ocard{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--orphan);
+  border-radius:9px;padding:11px 13px;box-shadow:var(--shadow);}
+.ocard.glue{border-left-color:var(--border);opacity:.9;}
+.ocard .on{font-weight:600;font-size:13px;} .ocard .ot{font-size:11.5px;color:var(--text-dim);margin-top:2px;}
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--border);
+  color:var(--text-dim);font-size:12px;line-height:1.7;}
+.toggle{cursor:pointer;background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+  border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;font-family:inherit;}
+.toggle:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+@media (max-width:560px){.meta{text-align:left}.kv{grid-template-columns:1fr}}
+
+.asil{font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;
+  padding:2px 8px;border-radius:6px;white-space:nowrap;}
+.asil-QM{color:var(--text-dim);background:var(--surface-2);border:1px solid var(--border);}
+.asil-A{color:#2f6f8f;background:var(--good-bg);}
+.asil-B{color:var(--warn);background:var(--warn-bg);}
+.asil-C{color:#d9761f;background:var(--warn-bg);}
+.asil-D{color:var(--bad);background:var(--bad-bg);}
+.prio{font-weight:700;font-size:11.5px;padding:2px 9px;border-radius:6px;font-family:ui-monospace,monospace;}
+.prio-P1{color:#fff;background:var(--bad);} .prio-P2{color:#3a2a00;background:var(--warn);}
+.prio-P3{color:var(--text-dim);background:var(--surface-2);border:1px solid var(--border);}
+.chain{display:flex;gap:6px;flex-wrap:wrap;}
+.link{font-size:11px;padding:2px 8px;border-radius:6px;white-space:nowrap;}
+.link.ok{color:var(--good);background:var(--good-bg);} .link.no{color:var(--bad);background:var(--bad-bg);}
+.swe{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;}
+.swecard{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:13px 15px;
+  box-shadow:var(--shadow);border-top:3px solid var(--border);}
+.swecard.complete{border-top-color:var(--good);} .swecard.in-progress{border-top-color:var(--warn);}
+.swecard.not-started{border-top-color:var(--bad);}
+.swecard .id{font-family:ui-monospace,monospace;font-weight:700;font-size:13px;}
+.swecard .nm{font-size:12px;color:var(--text-dim);margin:3px 0 8px;line-height:1.35;}
+.swecard .st{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
+.swecard.complete .st{color:var(--good);} .swecard.in-progress .st{color:var(--warn);}
+.swecard.not-started .st{color:var(--bad);}
+.pl-detail{color:var(--text-dim);font-size:12.5px;margin-top:3px;}
+.pl-action{color:var(--text);font-size:12.5px;margin-top:5px;}
+.pl-action b{color:var(--accent);}
+.stagebar{display:flex;gap:3px;margin-top:10px;flex-wrap:wrap;}
+.stg{flex:1;min-width:20px;height:26px;border-radius:4px;background:var(--surface-2);
+  border:1px solid var(--border);font-size:10px;display:flex;align-items:center;justify-content:center;
+  color:var(--text-dim);font-family:ui-monospace,monospace;}
+.stg.done{background:var(--good-bg);color:var(--good);border-color:var(--good);}
+.stg.skip{background:var(--bad-bg);color:var(--bad);border-color:var(--bad);}
+.stg.now{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700;}
+.caveat{font-size:12px;color:var(--text-dim);background:var(--surface-2);border:1px solid var(--border);
+  border-radius:8px;padding:10px 13px;margin:10px 0 4px;}
+</style></head><body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="eyebrow">ISO 26262 / ASPICE Compliance Cross-check</p>
+      <h1>ACC_Project — Compliance & Prioritized Punch-list</h1>
+      <p class="sub">Requirement.docx &nbsp;·&nbsp; ASIL / ISO 26262-6 Part 6 / ASPICE SWE.1–6</p>
+    </div>
+    <div class="meta">
+      <button class="toggle" id="themeBtn">◐ Theme</button><br>
+      <span>Generated <b>2026-08-07 10:40 UTC</b></span><br>
+      <span>12 requirements · stage 7 — Code Generation</span>
+    </div>
+  </header>
+
+  <div class="kpis">
+      <div class="tile stripe s-bad"><div class="lbl">Priority-1 findings</div>
+        <div class="val mono">1</div><div class="note">highest ASIL × stage risk</div></div>
+      <div class="tile stripe s-warn"><div class="lbl">ASIL B requirements</div>
+        <div class="val mono">10</div><div class="note">of 12 · 0 with no implementation</div></div>
+      <div class="tile stripe s-bad"><div class="lbl">Verification coverage</div>
+        <div class="val mono">0/12</div><div class="note">of implemented reqs · Design↔Verification</div></div>
+      <div class="tile stripe s-accent"><div class="lbl">Program stage</div>
+        <div class="val mono">7</div><div class="note">Code Generation</div></div>
+    </div>
+
+  <div class="caveat"><b>Program stage</b> (auto-detected from artifacts; override with
+    <span class="mono">--stage N</span>). Green = evidence found, red = skipped, blue = current.
+    <div class="stagebar"><div class="stg done" title="Requirements Definition">1</div><div class="stg done" title="Architecture &amp; ASIL/QM Allocation">2</div><div class="stg done" title="Model Design (MBD)">3</div><div class="stg done" title="SLDD &amp; AUTOSAR Interface Mapping">4</div><div class="stg done" title="Model Advisor / Static Checks">5</div><div class="stg skip" title="Model-in-the-Loop (MIL) Test">6</div><div class="stg now" title="Code Generation">7</div><div class="stg " title="SIL / PIL">8</div><div class="stg " title="Static Code Analysis">9</div><div class="stg " title="Hardware-in-the-Loop (HIL) Test">10</div><div class="stg " title="V&amp;V Closure">11</div><div class="stg " title="Release / Sign-off">12</div></div></div>
+
+  <h2>Prioritized punch-list — ranked by ASIL × program stage</h2>
+  <div class="tablecard"><div class="scroll"><table>
+    <thead><tr><th>Priority</th><th>ASIL</th><th>Finding &amp; recommended action</th></tr></thead>
+    <tbody>
+        <tr>
+          <td><span class="prio prio-P1">P1</span></td>
+          <td><span class="asil asil-B">ASIL B</span></td>
+          <td><div style="font-weight:600">No requirement-based verification for 10 ASIL B requirement(s)</div>
+            <div class="pl-detail">ISO 26262-6 Design↔Verification link absent and ASPICE SWE.4 (MIL) has no test cases. Program is at Code Generation while MIL verification is empty. · <span class="mono" style="font-size:11.5px">Requirement 1, Requirement 2, Requirement 3, Requirement 3c, Requirement 3c (i), Requirement 3c (ii), Requirement 3c (iii), Requirement 3c (iv), Requirement 3c (v), Requirement 3c (vi)</span></div>
+            <div class="pl-action"><b>Action:</b> Create requirement-linked MIL test cases and re-run the trace audit.</div></td>
+        </tr>
+        <tr>
+          <td><span class="prio prio-P2">P2</span></td>
+          <td><span class="chip">unclassified</span></td>
+          <td><div style="font-weight:600">Orphan logic: Adaptive_Cruise_Control (SubSystem)</div>
+            <div class="pl-detail">Model element with no requirement link (SID 79). Untraced logic must be justified or linked per ISO 26262-6 / ASPICE SWE.2 bidirectional traceability.</div>
+            <div class="pl-action"><b>Action:</b> Link to a requirement or document as intentionally untraced.</div></td>
+        </tr>
+        <tr>
+          <td><span class="prio prio-P2">P2</span></td>
+          <td><span class="chip">unclassified</span></td>
+          <td><div style="font-weight:600">Orphan logic: Unit Delay (UnitDelay)</div>
+            <div class="pl-detail">Model element with no requirement link (SID 103). Untraced logic must be justified or linked per ISO 26262-6 / ASPICE SWE.2 bidirectional traceability.</div>
+            <div class="pl-action"><b>Action:</b> Link to a requirement or document as intentionally untraced.</div></td>
+        </tr>
+        <tr>
+          <td><span class="prio prio-P2">P2</span></td>
+          <td><span class="asil asil-QM">QM</span></td>
+          <td><div style="font-weight:600">No requirement-based verification for 2 QM requirement(s)</div>
+            <div class="pl-detail">ISO 26262-6 Design↔Verification link absent and ASPICE SWE.4 (MIL) has no test cases. Program is at Code Generation while MIL verification is empty. · <span class="mono" style="font-size:11.5px">Requirement 3a, Requirement 3b</span></div>
+            <div class="pl-action"><b>Action:</b> Create requirement-linked MIL test cases and re-run the trace audit.</div></td>
+        </tr>
+        <tr>
+          <td><span class="prio prio-P2">P2</span></td>
+          <td><span class="chip">process</span></td>
+          <td><div style="font-weight:600">ASPICE SWE.4 not started — Software Unit Verification (MIL)</div>
+            <div class="pl-detail">No work products found for SWE.4.</div>
+            <div class="pl-action"><b>Action:</b> Plan and execute SWE.4 work products for the current stage.</div></td>
+        </tr>
+        <tr>
+          <td><span class="prio prio-P3">P3</span></td>
+          <td><span class="chip">process</span></td>
+          <td><div style="font-weight:600">ASPICE SWE.6 not started — Software Qualification Test (HIL)</div>
+            <div class="pl-detail">No work products found for SWE.6.</div>
+            <div class="pl-action"><b>Action:</b> Plan and execute SWE.6 work products for the current stage.</div></td>
+        </tr></tbody>
+  </table></div></div>
+
+  <h2>ISO 26262-6 Part 6 — bidirectional traceability chain</h2>
+  <div class="tablecard"><div class="scroll"><table>
+    <thead><tr><th>Requirement</th><th>ASIL</th><th>Trace chain</th></tr></thead>
+    <tbody>
+        <tr>
+          <td><div class="req-id mono">Requirement 1</div>
+            <div class="req-title">Lead Vehicle</div></td>
+          <td><span class="asil asil-B">ASIL B</span></td>
+          <td><div class="chain"><span class="link ok">✓ Req ↔ Architecture</span><span class="link ok">✓ Architecture ↔ Design</span><span class="link no">✗ Design ↔ Verification</span><span class="link no">✗ Verification ↔ Safety case</span></div></td>
+        </tr>
+        <tr>
+          <td><div class="req-id mono">Requirement 2</div>
+            <div class="req-title">Drive Vehicle</div></td>
+          <td><span class="asil asil-B">ASIL B</span></td>
+          <td><div class="chain"><span class="link ok">✓ Req ↔ Architecture</span><span class="link ok">✓ Architecture ↔ Design</span><span class="link no">✗ Design ↔ Verification</span><span class="link no">✗ Verification ↔ Safety case</span></div></td>
+        </tr>
+        <tr>
+          <td><div class="req-id mono">Requirement 3</div>
+            <div class="req-title">Adaptive Cruise Control Algorithm</div></td>
+          <td><span class="asil asil-B">ASIL B</span></td>
+          <td><div class="chain"><span class="link ok">✓ Req ↔ Architecture</span><span class="link ok">✓ Architecture ↔ Design</span><span class="link no">✗ Design ↔ Verification</span><span class="link no">✗ Verification ↔ Safety case</span></div></td>
+        </tr>
+        <tr>
+          <td><div class="req-id mono">Requirement 3a</div>
+            <div class="req-title">ACC OFF MODE state logic</div></td>
+          <td><span class="asil asil-QM">QM</span></td>
+          <td><div class="chain"><span class="link ok">✓ Req ↔ Architecture</span><span class="link ok">✓ Architecture ↔ Design</span><span class="link no">✗ Design ↔ Verification</span><span class="link no">✗ Verification ↔ Safety case</span></div></td>
+        </tr>
+        <tr>
+          <td><div class="req-id mono">Requirement 3b</div>
+            <div class="req-title">ACC STANDBY MODE state logic</div></td>
+          <td><span class="asil asil-QM">QM</span></td>
+          <td><div class="chain"><span class="link ok">✓ Req ↔ Architecture</span><span class="link ok">✓ Architecture ↔ Design</span><span class="link no">✗ Design ↔ Verification</span><span class="link no">✗ Verification ↔ Safety case</span></div></td>
+        </tr>
+        <tr>
+          <td><div class="req-id mono">Requirement 3c</div>
+            <div class="req-title">ACC ON MODE state logic</div></td>
+          <td><span class="asil asil-B">ASIL B</span></td>
+          <td><div class="chain"><span class="link ok">✓ Req ↔ Architecture</span><span class="link ok">✓ Architecture ↔ Design</span><span class="link no">✗ Design ↔ Verification</span><span class="link no">✗ Verification ↔ Safety case</span></div></td>
+        </tr>
+        <tr>
+          <td><div class="req-id mono">Requirement 3c (i)</div>
+            <div class="req-title">LeadVehicle_Detected_Follow (ACC ON MODE)</div></td>
+          <td><span class="asil asil-B">ASIL B</span></td>
+          <td><div class="chain"><span class="link ok">✓ Req ↔ Architecture</span><span class="link ok">✓ Architecture ↔ Design</span><span class="link no">✗ Design ↔ Verification</span><span class="link no">✗ Verification ↔ Safety case</span></div></td>
+        </tr>
+        <tr>
+          <td><div class="req-id mono">Requirement 3c (ii)</div>
+            <div class="req-title">LeadVehicle_Not_Detected (ACC ON MODE)</div></td>
+          <td><span class="asil asil-B">ASIL B</span></td>
+          <td><div class="chain"><span class="link ok">✓ Req ↔ Architecture</span><span class="link ok">✓ Architecture ↔ Design</span><span class="link no">✗ Design ↔ Verification</span><span class="link no">✗ Verification ↔ Safety case</span></div></td>
+        </tr>
+        <tr>
+          <td><div class="req-id mono">Requirement 3c (iii)</div>
+            <div class="req-title">LeadVehicle_Detected_Resume (ACC ON MODE)</div></td>
+          <td><span class="asil asil-B">ASIL B</span></td>
+          <td><div class="chain"><span class="link ok">✓ Req ↔ Architecture</span><span class="link ok">✓ Architecture ↔ Design</span><span class="link no">✗ Design ↔ Verification</span><span class="link no">✗ Verification ↔ Safety case</span></div></td>
+        </tr>
+        <tr>
+          <td><div class="req-id mono">Requirement 3c (iv)</div>
+            <div class="req-title">LeadVehicle_Not_Detected_Resume (ACC ON MODE)</div></td>
+          <td><span class="asil asil-B">ASIL B</span></td>
+          <td><div class="chain"><span class="link ok">✓ Req ↔ Architecture</span><span class="link ok">✓ Architecture ↔ Design</span><span class="link no">✗ Design ↔ Verification</span><span class="link no">✗ Verification ↔ Safety case</span></div></td>
+        </tr>
+        <tr>
+          <td><div class="req-id mono">Requirement 3c (v)</div>
+            <div class="req-title">LeadVehicle_Speed_lessthan_Set_Speed (ACC ON MODE)</div></td>
+          <td><span class="asil asil-B">ASIL B</span></td>
+          <td><div class="chain"><span class="link ok">✓ Req ↔ Architecture</span><span class="link ok">✓ Architecture ↔ Design</span><span class="link no">✗ Design ↔ Verification</span><span class="link no">✗ Verification ↔ Safety case</span></div></td>
+        </tr>
+        <tr>
+          <td><div class="req-id mono">Requirement 3c (vi)</div>
+            <div class="req-title">LeadVehicle_Speed_equal_Set_Speed (ACC ON MODE)</div></td>
+          <td><span class="asil asil-B">ASIL B</span></td>
+          <td><div class="chain"><span class="link ok">✓ Req ↔ Architecture</span><span class="link ok">✓ Architecture ↔ Design</span><span class="link no">✗ Design ↔ Verification</span><span class="link no">✗ Verification ↔ Safety case</span></div></td>
+        </tr></tbody>
+  </table></div></div>
+
+  <h2>ASPICE SWE.1–6 — work-product status</h2>
+  <div class="swe"><div class="swecard complete"><div class="id">SWE.1</div><div class="nm">Software Requirements Analysis</div><div class="st">Complete</div></div><div class="swecard complete"><div class="id">SWE.2</div><div class="nm">Software Architectural Design</div><div class="st">Complete</div></div><div class="swecard complete"><div class="id">SWE.3</div><div class="nm">Detailed Design &amp; Unit Construction</div><div class="st">Complete</div></div><div class="swecard not-started"><div class="id">SWE.4</div><div class="nm">Software Unit Verification (MIL)</div><div class="st">Not started</div></div><div class="swecard in-progress"><div class="id">SWE.5</div><div class="nm">Integration &amp; Integration Test (SIL/PIL)</div><div class="st">In progress</div></div><div class="swecard not-started"><div class="id">SWE.6</div><div class="nm">Software Qualification Test (HIL)</div><div class="st">Not started</div></div></div>
+
+  <footer>
+    <b>Scope:</b> tasks 5–6 — ASIL classification, ISO 26262-6 Part 6 trace-chain check,
+    ASPICE SWE.1–6 status, and ASIL×stage prioritization. Built on the workflow-1
+    traceability audit.<br>
+    <b>ASIL note:</b> the source requirements carry no explicit ASIL tag, so ASIL here is
+    <em>indicative</em> — feature-level allocation derived from the ASIL_Classification_Standard
+    worked ACC example (ACC longitudinal control = ASIL B). Confirm with a formal S/E/C
+    assessment.<br>
+    Generated by <span class="mono">tools/compliance_audit.py</span>.
+  </footer>
+</div>
+<script>
+(function(){
+  var root=document.documentElement;
+  var btn=document.getElementById('themeBtn');
+  function cur(){return root.getAttribute('data-theme')||
+    (matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');}
+  btn.addEventListener('click',function(){
+    var next=cur()==='dark'?'light':'dark';
+    root.setAttribute('data-theme',next);
+    btn.textContent=next==='dark'?'\u2600 Light':'\u263e Dark';
+  });
+})();
+</script>
+</body></html>

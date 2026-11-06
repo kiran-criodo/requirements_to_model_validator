@@ -1,131 +1,104 @@
 # Requirements to Model Validator
 
-An AI **agent** that validates a model against a set of requirements. Built in any
-AI-enabled code editor — **no coding required**. You build and run it just by chatting
-with an AI assistant.
+**An AI agent that audits a Simulink model against its requirements, plus the ISO 26262 and
+ASPICE checks, continuously instead of once before a milestone review.**
 
-> **Works with any IDE and any LLM.** Use whatever AI-enabled IDE you like — VSCode,
-> Cursor, JetBrains, and others — with whatever LLM that IDE supports (Claude, GPT,
-> Gemini, and more). This guide uses **Claude in VSCode** as the running example; wherever
-> you see "Claude" or "VSCode," substitute your own assistant and editor. The agent's
-> rulebook lives in `CLAUDE.md`; if your assistant reads a different filename (for example
-> `AGENTS.md`), copy or point it at that file.
+On ADAS programs, requirement-to-model traceability is usually checked by hand just before
+an ISO 26262 / ASPICE review, so gaps surface late. This agent gives function owners, safety
+engineers and MBD leads that picture on demand. It reads the requirements document and the
+Simulink model, works out which model elements implement each requirement, and reports:
 
-## Step 1 — Make your own copy from this template
+- what's **traced**, **partial** or **missing** (a gap)
+- **orphan logic**: model elements that no requirement asks for
+- where the requirement set stands against **ASIL**, **ISO 26262-6 traceability** and
+  **ASPICE SWE.1–SWE.6**, with a **punch-list ranked by ASIL × program stage**
 
-This is a **GitHub template repository**, so you don't clone it directly — you stamp out
-your own copy, already named after your agent:
+It was first built live, on stage, for automotive engineering leaders (Skill-Lync for
+Business, 7 Aug 2026), using VS Code and Claude Code on the
+[Agent Builder Template](https://github.com/kiran-criodo/agent-builder-template).
 
-1. On this repo's GitHub page, click the green **Use this template** button →
-   **Create a new repository**.
-2. Give the new repository **your agent's name** (e.g. `weekly-sales-bot`), pick
-   public or private, and click **Create repository**. GitHub makes a brand-new repo with
-   that name and a clean history — not a fork of the template.
-3. **Clone** (download) your new repo to your computer — via your IDE's *Clone
-   Repository* command (in VSCode: *Source Control → Clone Repository*), or run
-   `git clone <your-new-repo-url>`.
+> **See it without running anything:** open
+> [`examples/ACC_traceability_dashboard.html`](examples/ACC_traceability_dashboard.html) and
+> [`examples/ACC_compliance_dashboard.html`](examples/ACC_compliance_dashboard.html)
+> (download and open in a browser). They were produced from the Adaptive Cruise Control
+> model in `resources/`.
 
-Because you named the repo up front, your folder already carries your agent's name — no
-renaming needed later.
+## What it can do
 
-> No GitHub account? You can instead run `git clone
-> https://github.com/kiran-criodo/agent-builder-template.git your-agent-name` to download
-> the starter into a folder named after your agent, and add an online home for it later.
+| # | Capability | Say something like | Workflow |
+|---|------------|--------------------|----------|
+| 1 | Requirement → model traceability audit | "run a traceability audit on the ACC model" | [traceability-audit](workflows/traceability-audit.md) |
+| 2 | ASIL / ISO 26262 / ASPICE cross-check and prioritised punch-list | "what's blocking stage 7?", "ASPICE status" | [compliance-audit](workflows/compliance-audit.md) |
+| 3 | Answer questions grounded in the audit results | "which ASIL B requirements aren't verified?" | [ask-questions](workflows/ask-questions.md) |
+| 4 | Email a report to a reviewer | "email the VDD reports to the safety lead" | [send-email](workflows/send-email.md) |
+| 5 | Track LLM token usage and cost | "how much has this cost?" | [token-usage](workflows/token-usage.md) |
 
-## Step 2 — Start building
-
-Open your new folder in your AI-enabled IDE (e.g. VSCode with the Claude extension),
-make sure the AI assistant is connected, and type:
-
-> **Let's start Building**
-
-Your assistant will then interview you step by step and create everything for you.
-
-> **Tip — you can schedule it.** Once a workflow works, your agent doesn't have to be run
-> by hand every time. Most AI-enabled assistants can run a workflow **periodically** (e.g.
-> every morning, or once an hour) — just ask yours in plain English. See *"Running Your
-> Agent on a Schedule"* in [`CREATE_AGENT_PROCESS.md`](CREATE_AGENT_PROCESS.md).
-
-## What's here
-
-- **`CREATE_AGENT_PROCESS.md`** — the full, plain-English guide. Read it first if you
-  like, or just say "Let's start Building" and follow along.
-- **`CLAUDE.md`** — the agent's rulebook. It also contains the guided-build instructions
-  your assistant follows while helping you. (If your assistant reads a different filename,
-  such as `AGENTS.md`, copy or point it at this file.)
-- **`docs/SETUP.md`** — how to set up your computer (one-time).
-- **`docs/CONNECTORS.md`** — connecting your agent to outside services (cloud drive,
-  email, databases, WhatsApp, MCP servers) for input *and* output.
-- **`docs/GIT_GUIDE.md`** — sharing your agent with others, in plain language.
-- Folders (`workflows/`, `tools/`, `memory/`, …) — the agent's parts, filled in as you
-  build.
-
-## Sending reports by email — configuring `.env`
-
-The agent can email its reports (the traceability and compliance dashboards) to a reviewer
-using [`tools/send_email.py`](tools/send_email.py). To do that it needs your mail-server
-login. **These credentials live in a private file called `.env`** — never in any file that
-gets shared or committed (`.env` is already listed in `.gitignore`).
-
-### 1. Create your `.env` file
-In the project folder, copy the template and open the copy:
-
-```bash
-cp .env.example .env
-```
-
-`.env.example` only lists the *names* of the settings (safe to share); your real values go
-in `.env` (kept private). Fill in these lines:
-
-| Setting | What it is | Example |
-|---|---|---|
-| `SMTP_HOST` | Your mail provider's outgoing (SMTP) server | `smtp.gmail.com` |
-| `SMTP_PORT` | The port. `587` for STARTTLS (normal), `465` for SSL | `587` |
-| `SMTP_USER` | The account you log in with — usually your full email address | `you@gmail.com` |
-| `SMTP_PASSWORD` | The password / **app password** for that account (see below) | `abcd efgh ijkl mnop` |
-| `EMAIL_FROM` | The "From" address recipients see (optional; defaults to `SMTP_USER`) | `you@gmail.com` |
-| `SMTP_SECURITY` | Optional. `starttls` (default for 587), `ssl` (for 465), or `none` | `starttls` |
-
-A filled-in `.env` looks like:
+The workflows build on each other:
 
 ```
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=you@gmail.com
-SMTP_PASSWORD=abcdefghijklmnop
-EMAIL_FROM=you@gmail.com
+requirements (.docx) + model (.slx) + links (.slmx)
+        │
+        ▼
+  traceability audit ──► compliance cross-check ──► punch-list
+        │                        │
+        └──────► Q&A over the results ◄──────┘ ──► email to reviewer
 ```
 
-### 2. Gmail users: use an **App Password**, not your normal password
-Google blocks your everyday password for apps like this. Instead:
+## How it works
 
-1. Turn on **2-Step Verification** on your Google account (required to create app passwords):
-   <https://myaccount.google.com/security>.
-2. Go to <https://myaccount.google.com/apppasswords>, create a new app password (name it
-   e.g. "Requirements Validator"), and copy the **16-character** code it shows.
-3. Paste that code as `SMTP_PASSWORD` (spaces don't matter).
+- **Deterministic core, AI on top.** Parsing and matching are plain Python, so the same
+  inputs always give the same audit. The assistant chooses the workflow, runs the tools,
+  checks the results and explains them. Answers to questions come from the audit data
+  (`tools/ask.py`), never from memory.
+- **No MATLAB needed.** `.slx`, `.slmx` and `.docx` files are zipped XML, so the agent
+  parses them directly. It needs no Simulink licence, no network and no connectors.
+- **Matching evidence is explicit.** Each requirement-to-element match records *how* it was
+  found: an existing Requirements Toolbox link, a naming convention, or semantic
+  similarity. Reviewers can see how strong each match is.
+- **Honest by rule.** The agent's contract (`CLAUDE.md`) forbids inventing gaps or matches
+  and requires every audit to be spot-checked before it's presented.
 
-> **Other providers.** Use your provider's SMTP host and port instead — e.g. Outlook/Office 365
-> `smtp.office365.com` port `587`, Yahoo `smtp.mail.yahoo.com` port `465` (`SMTP_SECURITY=ssl`).
-> Most providers also require an app password when 2-factor authentication is on.
+## Quick start
 
-### 3. Test it, then send
-First do a dry run (checks your settings and the attachments **without sending**):
+1. Set up once: Python 3.10+, then
+   ```bash
+   python3 -m venv .venv && source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+   More detail in [docs/SETUP.md](docs/SETUP.md).
+2. Open the folder in VS Code with the Claude extension (or run Claude Code in it).
+3. Ask in plain English, e.g. *"Run the traceability and compliance audit on the ACC
+   model."* Or run the tools directly:
+   ```bash
+   python3 tools/trace_audit.py          # defaults to the ACC example in resources/
+   python3 tools/compliance_audit.py     # program stage auto-detected; or --stage 7
+   python3 tools/ask.py --asil "ASIL B" --unverified
+   ```
+   Results go to `output/` (HTML dashboards plus JSON).
 
-```bash
-python3 tools/send_email.py --to you@example.com --subject "Test" --body "Hello" --dry-run
-```
+To audit your own model, pass `--req`, `--model` and `--links`. Use distinct `--out` and
+`--json` paths so you don't overwrite another audit.
 
-If that prints a valid summary, drop `--dry-run` to send for real. The full send workflow —
-including the ready-to-run command that mails the VDD reports — is in
-[`workflows/send-email.md`](workflows/send-email.md). Or just ask your assistant in plain
-English: *"email the VDD reports to someone@example.com."*
+## What's in the repo
 
-> **Prefer not to manage passwords?** You can instead authorize the **Gmail connector** once
-> in an interactive session (claude.ai connector settings, or `/mcp` in interactive Claude
-> Code) and skip `.env` entirely. See [`docs/CONNECTORS.md`](docs/CONNECTORS.md).
+| Path | What's there |
+|------|--------------|
+| `CLAUDE.md` | The agent's operating contract: purpose, rules, scope and request routing |
+| `workflows/` | Plain-English recipes for each capability |
+| `tools/` | The Python tools the workflows run |
+| `resources/` | Sample inputs: the ACC and VDD models with their requirements, plus the ASIL, ISO 26262/ASPICE and program-stage reference documents |
+| `examples/` | Sample dashboards produced from the ACC example |
+| `output/` | Generated reports (not committed) |
+| `docs/` | [SETUP](docs/SETUP.md), [ARCHITECTURE](docs/ARCHITECTURE.md), [CONNECTORS](docs/CONNECTORS.md), [EMAIL_SETUP](docs/EMAIL_SETUP.md), [GIT_GUIDE](docs/GIT_GUIDE.md) |
 
-## New to this?
+## Sending reports by email
 
-Start with [`CREATE_AGENT_PROCESS.md`](CREATE_AGENT_PROCESS.md). It explains what an
-agent is and walks you through building one from scratch.
+The email tool reads SMTP settings from a private `.env` file. Setup, including Gmail app
+passwords, is in [docs/EMAIL_SETUP.md](docs/EMAIL_SETUP.md). Always try `--dry-run` first.
+
+## Built with the Agent Builder Template
+
+This agent started as a copy of the
+[Agent Builder Template](https://github.com/kiran-criodo/agent-builder-template), which lets
+anyone build an agent by describing it to an AI assistant. The original build instructions
+are kept in `CREATE_AGENT_PROCESS.md` and Part A of `CLAUDE.md`.

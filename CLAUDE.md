@@ -197,6 +197,10 @@ underlying traceability matrix data.
 - `tools/send_email.py` — deliver a report by email (SMTP, stdlib). Reads `SMTP_*` creds from
   `.env` only; supports `--attach` (repeatable), `--body-file`, and `--dry-run`. See
   `workflows/send-email.md`.
+- `tools/token_usage.py` — meter Claude API token usage + cost (stdlib). `UsageTracker` for
+  code (`record_response(resp)`), plus `record`/`summary`/`models` CLI. Logs to
+  `data/token_usage.jsonl`. NB: the current tools make no LLM calls, so nothing is metered yet.
+  See `workflows/token-usage.md`.
 - `resources/ACC (Adaptive Cruise Control)/` — the worked ACC example: `Requirement.docx`,
   `ACC_Project.slx`, `ACC_Project.slmx` (plus generated code and Model Advisor reports).
 - `resources/*.docx` — standards/rulebooks (ASIL classification, ISO 26262/ASPICE guidelines,
@@ -215,3 +219,6 @@ underlying traceability matrix data.
 - "email/send/mail the report(s) to <someone>", "send the dashboard to the safety lead"
   → `workflows/send-email.md` (runs `tools/send_email.py`). Confirm recipient + attachments
   first; needs `SMTP_*` in `.env` (Gmail → App Password) or the authorized Gmail connector.
+- "token usage", "LLM cost", "how much has this cost?", "usage report" → `workflows/token-usage.md`
+  (runs `tools/token_usage.py`). State honestly that the current tools make no LLM calls, so the
+  meter is empty until an LLM-backed step is added; report numbers from the tool, never from memory.

@@ -160,6 +160,53 @@ def parse_data_dictionary(slx_path: str):
 
 
 # --------------------------------------------------------------------------- #
+# Signal connectivity — detect subsystem input ports that are not wired up.
+# A block/subsystem can exist and be requirement-linked yet still be an
+# *incomplete* implementation if one of its inputs is left dangling (e.g. the
+# VDD "incomplete" model, where Requirement2_Subsystem's CameraInput_RoadSign
+# input is never connected). Simulink stores each connection as a <Line> with
+# <P Name="Dst">SID#in:N</P>; an input port with no such Dst is unconnected.
+# --------------------------------------------------------------------------- #
+def _unconnected_inputs(systems):
+    """Map each SubSystem (by SID and by lowercased name) to the list of its
+    internal Inport names whose port is not driven by any line in the model."""
+    connected = set()          # every "SID#in:N" destination that has a line
+    for content in systems.values():
+        for line in re.findall(r"<Line>.*?</Line>", content, re.S):
+            for dst in re.findall(r'<P Name="Dst">([^<]+)</P>', line):
+                connected.add(dst.strip())
+
+    # Inports of subsystem with SID N live in system_N.xml; their <P Name="Port">
+    # gives the parent-side port index (defaults to 1 when absent).
+    by_sid = {re.search(r"system_(\w+)\.xml$", f).group(1): c for f, c in systems.items()}
+
+    def inports(sid):
+        ports = {}
+        for m in re.finditer(
+            r'<Block\b[^>]*BlockType="Inport"[^>]*Name="([^"]+)"[^>]*SID="[^"]+"(.*?)</Block>',
+            by_sid.get(sid, ""), re.S,
+        ):
+            name = re.sub(r"\s+", " ", html.unescape(m.group(1))).strip()
+            pm = re.search(r'<P Name="Port">(\d+)</P>', m.group(2))
+            ports[int(pm.group(1)) if pm else 1] = name
+        return ports
+
+    unconnected = {}   # keyed by both sid and name.lower() -> [dangling input names]
+    for content in systems.values():
+        for m in re.finditer(
+            r'<Block\b[^>]*BlockType="SubSystem"[^>]*Name="([^"]+)"[^>]*SID="([^"]+)"', content
+        ):
+            name = re.sub(r"\s+", " ", html.unescape(m.group(1))).strip()
+            sid = m.group(2)
+            dangling = [nm for p, nm in sorted(inports(sid).items())
+                        if f"{sid}#in:{p}" not in connected]
+            if dangling:
+                unconnected[sid] = dangling
+                unconnected[name.lower()] = dangling
+    return unconnected
+
+
+# --------------------------------------------------------------------------- #
 # Task 2 — parse Simulink model (.slx)
 # --------------------------------------------------------------------------- #
 def parse_model(slx_path: str):
@@ -227,6 +274,7 @@ def parse_model(slx_path: str):
         "parent_of": parent_of,
         "block_names": {b["name"] for b in blocks},   # every block, incl. Constants
         "dict_names": parse_data_dictionary(slx_path), # .sldd calibrations/signals
+        "unconnected_inputs": _unconnected_inputs(systems),  # incomplete wiring
     }
 
 
@@ -351,6 +399,7 @@ def audit(reqs, model, links):
         })
 
         evidence, target, confidence = None, None, None
+        unconnected_inputs = []
         rtype = (r.get("type") or "").lower()
 
         if rtype == "process":
@@ -411,8 +460,17 @@ def audit(reqs, model, links):
                         evidence = "Semantic (naming differs)"
                         target, confidence = sbest[0], "medium"
 
+            # Incomplete wiring: the resolved subsystem exists and is linked, but one
+            # of its inputs is left unconnected (e.g. VDD-incomplete's CameraInput_RoadSign).
+            # That is a real, provable gap even when block presence + links look complete.
+            unconnected_inputs = (model.get("unconnected_inputs", {}).get((target or "").lower(), [])
+                                  if target else [])
             if target:
-                status = "Partial" if (missing_signals or confidence in ("medium", "low")) else "Matched"
+                status = ("Partial" if (missing_signals or unconnected_inputs
+                                        or confidence in ("medium", "low")) else "Matched")
+                if unconnected_inputs and evidence:
+                    evidence += (" — incomplete wiring: unconnected input(s): "
+                                 + ", ".join(unconnected_inputs))
             else:
                 status = "Gap"
 
@@ -422,6 +480,7 @@ def audit(reqs, model, links):
             "status": status, "evidence": evidence,
             "target": target, "confidence": confidence,
             "mentioned_signals": mentioned, "missing_signals": missing_signals,
+            "unconnected_inputs": unconnected_inputs,
         })
 
     # ------------------------------------------------------------------ #
